@@ -1,0 +1,265 @@
+@import 'tailwindcss';
+
+@import 'tw-animate-css';
+
+/* Fonts are bundled with the portal (no font CDN). Lato and Cinzel are the
+   card fonts, so cards render identically on every PC. */
+@import '@fontsource-variable/plus-jakarta-sans';
+@import '@fontsource/lato/300.css';
+@import '@fontsource/lato/400.css';
+@import '@fontsource/lato/700.css';
+@import '@fontsource/lato/900.css';
+@import '@fontsource/cinzel/400.css';
+@import '@fontsource/cinzel/600.css';
+@import '@fontsource/cinzel/700.css';
+
+@source '../views';
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+    --font-sans:
+        'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, sans-serif,
+        'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+        'Noto Color Emoji';
+    --font-display: 'Cinzel', Georgia, 'Times New Roman', serif;
+
+    --radius-lg: var(--radius);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-xl: calc(var(--radius) + 4px);
+    --radius-2xl: calc(var(--radius) + 10px);
+
+    /* BIU brand: the navy and gold of the printed cards */
+    --color-navy-50: oklch(0.97 0.012 275);
+    --color-navy-100: oklch(0.93 0.03 275);
+    --color-navy-200: oklch(0.86 0.06 275);
+    --color-navy-300: oklch(0.74 0.1 275);
+    --color-navy-400: oklch(0.6 0.14 275);
+    --color-navy-500: oklch(0.5 0.16 275);
+    --color-navy-600: oklch(0.42 0.15 275);
+    --color-navy-700: oklch(0.36 0.13 275);
+    --color-navy-800: oklch(0.29 0.1 275);
+    --color-navy-900: oklch(0.23 0.075 275);
+    --color-navy-950: oklch(0.17 0.05 275);
+
+    --color-gold-50: oklch(0.98 0.03 88);
+    --color-gold-100: oklch(0.95 0.07 88);
+    --color-gold-200: oklch(0.9 0.12 86);
+    --color-gold-300: oklch(0.85 0.15 84);
+    --color-gold-400: oklch(0.8 0.16 80);
+    --color-gold-500: oklch(0.75 0.16 75);
+    --color-gold-600: oklch(0.65 0.15 65);
+    --color-gold-700: oklch(0.53 0.13 60);
+
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+
+    --color-success: var(--success);
+    --color-warning: var(--warning);
+
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
+
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+    --background: oklch(0.985 0.004 275);
+    --foreground: oklch(0.2 0.04 275);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.2 0.04 275);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.2 0.04 275);
+    --primary: oklch(0.36 0.13 275);
+    --primary-foreground: oklch(0.985 0.005 275);
+    --secondary: oklch(0.955 0.012 275);
+    --secondary-foreground: oklch(0.3 0.09 275);
+    --muted: oklch(0.96 0.008 275);
+    --muted-foreground: oklch(0.5 0.03 275);
+    --accent: oklch(0.95 0.02 275);
+    --accent-foreground: oklch(0.3 0.1 275);
+    --destructive: oklch(0.577 0.215 27);
+    --destructive-foreground: oklch(0.577 0.215 27);
+    --success: oklch(0.6 0.14 155);
+    --warning: oklch(0.75 0.16 75);
+    --border: oklch(0.915 0.012 275);
+    --input: oklch(0.9 0.015 275);
+    --ring: oklch(0.6 0.14 275);
+    --chart-1: oklch(0.42 0.15 275);
+    --chart-2: oklch(0.75 0.16 75);
+    --chart-3: oklch(0.6 0.14 155);
+    --chart-4: oklch(0.6 0.14 275);
+    --chart-5: oklch(0.65 0.15 30);
+    --radius: 0.75rem;
+    --sidebar: oklch(0.25 0.085 275);
+    --sidebar-foreground: oklch(0.93 0.02 275);
+    --sidebar-primary: oklch(0.8 0.16 80);
+    --sidebar-primary-foreground: oklch(0.22 0.07 275);
+    --sidebar-accent: oklch(0.32 0.1 275);
+    --sidebar-accent-foreground: oklch(0.99 0.005 275);
+    --sidebar-border: oklch(0.34 0.08 275);
+    --sidebar-ring: oklch(0.8 0.16 80);
+}
+
+.dark {
+    --background: oklch(0.16 0.03 275);
+    --foreground: oklch(0.95 0.01 275);
+    --card: oklch(0.2 0.04 275);
+    --card-foreground: oklch(0.95 0.01 275);
+    --popover: oklch(0.2 0.04 275);
+    --popover-foreground: oklch(0.95 0.01 275);
+    --primary: oklch(0.8 0.16 80);
+    --primary-foreground: oklch(0.2 0.06 275);
+    --secondary: oklch(0.26 0.05 275);
+    --secondary-foreground: oklch(0.95 0.01 275);
+    --muted: oklch(0.24 0.04 275);
+    --muted-foreground: oklch(0.72 0.03 275);
+    --accent: oklch(0.27 0.06 275);
+    --accent-foreground: oklch(0.95 0.01 275);
+    --destructive: oklch(0.45 0.16 25);
+    --destructive-foreground: oklch(0.7 0.19 25);
+    --success: oklch(0.7 0.14 155);
+    --warning: oklch(0.8 0.16 80);
+    --border: oklch(0.3 0.05 275);
+    --input: oklch(0.32 0.05 275);
+    --ring: oklch(0.8 0.16 80);
+    --chart-1: oklch(0.7 0.14 275);
+    --chart-2: oklch(0.8 0.16 80);
+    --chart-3: oklch(0.7 0.14 155);
+    --chart-4: oklch(0.6 0.12 275);
+    --chart-5: oklch(0.7 0.15 30);
+    --sidebar: oklch(0.13 0.03 275);
+    --sidebar-foreground: oklch(0.93 0.02 275);
+    --sidebar-primary: oklch(0.8 0.16 80);
+    --sidebar-primary-foreground: oklch(0.2 0.06 275);
+    --sidebar-accent: oklch(0.22 0.05 275);
+    --sidebar-accent-foreground: oklch(0.99 0.005 275);
+    --sidebar-border: oklch(0.24 0.05 275);
+    --sidebar-ring: oklch(0.8 0.16 80);
+}
+
+@layer base {
+    * {
+        @apply border-border outline-ring/50;
+    }
+
+    body {
+        @apply bg-background text-foreground;
+        font-feature-settings: 'cv11', 'ss01';
+    }
+}
+
+/* ---------- ID card canvas (shared by preview, capture and print) ---------- */
+.id-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 32px;
+    -webkit-font-smoothing: antialiased;
+    color: #111;
+}
+.id-card img {
+    user-select: none;
+}
+
+/* Soft navy-gold wash used behind hero areas */
+.brand-wash {
+    background:
+        radial-gradient(
+            1200px 400px at 0% 0%,
+            oklch(0.8 0.16 80 / 0.18),
+            transparent 60%
+        ),
+        radial-gradient(
+            900px 500px at 100% 0%,
+            oklch(0.5 0.16 275 / 0.16),
+            transparent 60%
+        );
+}
+
+.brand-pattern {
+    background-image: radial-gradient(oklch(1 0 0 / 0.07) 1px, transparent 1px);
+    background-size: 18px 18px;
+}
+
+/* ---------- printing: exactly one CR80 card per page ---------- */
+.print-only {
+    display: none;
+}
+@media print {
+    @page {
+        size: 54mm 85.6mm;
+        margin: 0;
+    }
+    html,
+    body {
+        background: #fff !important;
+    }
+    /* Only the cards print: they are portalled straight into <body>,
+       and everything else at the top level is removed from the layout. */
+    body > *:not(.print-only) {
+        display: none !important;
+    }
+    .print-only {
+        display: block;
+    }
+    .print-hide {
+        display: none !important;
+    }
+    .print-page {
+        width: 54mm;
+        height: 85.6mm;
+        overflow: hidden;
+        page-break-after: always;
+        break-after: page;
+    }
+    .print-page:last-child {
+        page-break-after: auto;
+        break-after: auto;
+    }
+    .print-page .id-card {
+        transform: scale(0.377953);
+        transform-origin: top left;
+        border-radius: 0;
+    }
+    * {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}
