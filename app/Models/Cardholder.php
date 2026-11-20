@@ -2,14 +2,19 @@
 
 namespace App\Models;
 
+use App\Enums\HolderType;
 use App\Enums\StudentType;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 
-class Student extends Model
+/**
+ * A student or staff member who can hold an ID card.
+ *
+ * @property HolderType $type
+ */
+class Cardholder extends Model
 {
     protected $guarded = ['id'];
 
@@ -18,9 +23,11 @@ class Student extends Model
     protected function casts(): array
     {
         return [
+            'type' => HolderType::class,
             'date_of_birth' => 'date:Y-m-d',
             'student_type' => StudentType::class,
             'portal_synced_at' => 'datetime',
+            'signature_captured_at' => 'datetime',
         ];
     }
 
@@ -30,10 +37,9 @@ class Student extends Model
         return $this->hasMany(IdCard::class);
     }
 
-    /** @return HasOne<IdCard, $this> */
-    public function latestCard(): HasOne
+    public function isStaff(): bool
     {
-        return $this->hasOne(IdCard::class)->latestOfMany();
+        return $this->type === HolderType::Staff;
     }
 
     /** @return Attribute<string, never> */
@@ -44,7 +50,7 @@ class Student extends Model
         ]))));
     }
 
-    /** Matric number, name, phone or email. */
+    /** ID number (matric or staff), name, phone or email. */
     public function scopeSearch(Builder $query, ?string $term): Builder
     {
         $term = trim((string) $term);
@@ -54,22 +60,23 @@ class Student extends Model
 
         return $query->where(function (Builder $q) use ($term) {
             $like = '%'.str_replace(['%', '_'], ['\%', '\_'], $term).'%';
-            $q->where('matric_no', 'like', $like)
+            $q->where('id_number', 'like', $like)
                 ->orWhere('surname', 'like', $like)
                 ->orWhere('first_name', 'like', $like)
                 ->orWhere('middle_name', 'like', $like)
                 ->orWhere('phone', 'like', $like)
                 ->orWhere('email', 'like', $like);
 
-            // "OGIE PRAISE" style: every word must match some name part
+            // "OKAFOR ADA" style: every word must match some name part
             $words = preg_split('/\s+/', $term) ?: [];
             if (count($words) > 1) {
                 $q->orWhere(function (Builder $all) use ($words) {
                     foreach ($words as $w) {
+                        $w = '%'.str_replace(['%', '_'], ['\%', '\_'], $w).'%';
                         $all->where(fn (Builder $one) => $one
-                            ->where('surname', 'like', "%{$w}%")
-                            ->orWhere('first_name', 'like', "%{$w}%")
-                            ->orWhere('middle_name', 'like', "%{$w}%"));
+                            ->where('surname', 'like', $w)
+                            ->orWhere('first_name', 'like', $w)
+                            ->orWhere('middle_name', 'like', $w));
                     }
                 });
             }

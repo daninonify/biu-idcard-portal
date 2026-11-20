@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\HolderType;
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
 use App\Services\CardService;
-use App\Services\StudentDirectory\StudentDirectory;
+use App\Services\Directory\Directories;
 use App\Support\Toast;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,7 +18,7 @@ use Throwable;
 
 class SettingController extends Controller
 {
-    public function edit(StudentDirectory $directory): Response
+    public function edit(Directories $directories): Response
     {
         try {
             $rembg = Http::timeout(2)->get(rtrim(config('idcard.rembg.url'), '/').'/openapi.json')->successful();
@@ -25,18 +26,26 @@ class SettingController extends Controller
             $rembg = false;
         }
 
+        $describe = fn (HolderType $type) => [
+            'label' => $type === HolderType::Staff ? 'Staff records' : 'Student portal',
+            'name' => $directories->for($type)->name(),
+            'driver' => config("idcard.directory.{$type->value}.driver"),
+            'env' => $type === HolderType::Staff ? 'STAFF_DIRECTORY' : 'STUDENT_DIRECTORY',
+            'can_update_photo' => $directories->for($type)->supportsPhotoUpdate(),
+        ];
+
         return Inertia::render('admin/settings', [
             'settings' => [
                 'session' => Setting::get('session'),
                 'valid_until' => Setting::get('valid_until'),
+                'staff_valid_until' => Setting::get('staff_valid_until'),
                 'default_background' => Setting::get('default_background'),
                 'reprint_requires_reason' => (bool) Setting::get('reprint_requires_reason'),
                 'registrar_signature_url' => Setting::get('registrar_signature') ? route('settings.signature', ['v' => crc32((string) Setting::get('registrar_signature'))]) : null,
+                'legacy_signature_urls' => [route('signatures.legacy', 'a'), route('signatures.legacy', 'b')],
             ],
             'system' => [
-                'directory' => $directory->name(),
-                'directory_driver' => config('idcard.directory.driver'),
-                'can_update_photo' => $directory->supportsPhotoUpdate(),
+                'directories' => [$describe(HolderType::Student), $describe(HolderType::Staff)],
                 'rembg_url' => config('idcard.rembg.url'),
                 'rembg_running' => $rembg,
                 'photo_disk' => config('idcard.photo_disk'),
@@ -49,13 +58,14 @@ class SettingController extends Controller
         $data = $request->validate([
             'session' => ['required', 'string', 'regex:/^\d{4}\/\d{4}$/'],
             'valid_until' => ['required', 'string', 'max:20'],
+            'staff_valid_until' => ['required', 'string', 'max:20'],
             'default_background' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'reprint_requires_reason' => ['required', 'boolean'],
             'registrar_signature' => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp', 'max:2048'],
             'remove_signature' => ['nullable', 'boolean'],
         ], ['session.regex' => 'Use the form 2026/2027.']);
 
-        foreach (['session', 'valid_until', 'default_background', 'reprint_requires_reason'] as $key) {
+        foreach (['session', 'valid_until', 'staff_valid_until', 'default_background', 'reprint_requires_reason'] as $key) {
             Setting::put($key, $data[$key]);
         }
 

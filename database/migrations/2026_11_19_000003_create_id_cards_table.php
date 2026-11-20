@@ -10,9 +10,9 @@ return new class extends Migration
     {
         Schema::create('id_cards', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('student_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('cardholder_id')->constrained()->cascadeOnDelete();
             $table->string('session');                       // e.g. 2026/2027
-            $table->string('template');                      // ug | pg
+            $table->string('template');                      // category: ug | pg | staff
             $table->string('status')->default('pending');    // pending | captured | printed
             $table->string('valid_until')->nullable();
 
@@ -31,8 +31,8 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->timestamps();
 
-            $table->unique(['student_id', 'session']);
-            $table->index('status');
+            $table->unique(['cardholder_id', 'session']);
+            $table->index(['template', 'status']);
         });
     }
 

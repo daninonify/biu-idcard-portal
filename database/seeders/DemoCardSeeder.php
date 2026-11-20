@@ -2,30 +2,35 @@
 
 namespace Database\Seeders;
 
+use App\Enums\HolderType;
 use App\Models\CardEvent;
 use App\Models\User;
 use App\Services\CardService;
-use App\Services\StudentDirectory\DemoDirectory;
-use App\Services\StudentDirectory\PortalRecord;
+use App\Services\Directory\DemoDirectory;
+use App\Services\Directory\PortalRecord;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Auth;
 
 /**
- * Fictional students at every stage, so each screen has something to show.
- * Photos are drawn silhouettes, not people.
+ * Fictional students and staff at every stage, so each screen has something
+ * to show. Photos are drawn silhouettes, not people.
  */
 class DemoCardSeeder extends Seeder
 {
     public function run(CardService $cards): void
     {
-        $directory = new DemoDirectory;
         $operator = User::query()->where('email', 'operator@idcard.test')->firstOrFail();
         $admin = User::query()->where('email', 'admin@idcard.test')->firstOrFail();
         Auth::setUser($operator);
 
-        foreach (array_slice($directory->all(), 0, 26) as $i => $raw) {
-            $student = $cards->import(PortalRecord::fromArray($raw));
-            $card = $cards->cardFor($student, $operator);
+        $people = [
+            ...array_map(fn ($p) => [HolderType::Student, $p], array_slice((new DemoDirectory(HolderType::Student))->all(), 0, 26)),
+            ...array_map(fn ($p) => [HolderType::Staff, $p], array_slice((new DemoDirectory(HolderType::Staff))->all(), 0, 12)),
+        ];
+
+        foreach ($people as $i => [$type, $raw]) {
+            $holder = $cards->import($type, PortalRecord::fromArray($raw));
+            $card = $cards->cardFor($holder, $operator);
 
             if ($i % 3 === 0) {
                 continue; // pending: no photo yet

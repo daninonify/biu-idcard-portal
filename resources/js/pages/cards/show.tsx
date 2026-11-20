@@ -14,9 +14,10 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { DEFAULT_ADJUST, ScaledCard, TEMPLATES } from '@/components/id-card';
-import type { CardData } from '@/components/id-card';
+import type { CardData, Signatures } from '@/components/id-card';
 import InputError from '@/components/input-error';
 import {
+    CategoryBadge,
     Panel,
     StatusBadge,
     StudentAvatar,
@@ -61,17 +62,22 @@ import { store as pushToPortal } from '@/routes/portal-pictures';
 import type {
     CardDetail,
     EventRow,
+    HolderDetail,
     Option,
-    StudentDetail,
 } from '@/types/portal';
 
 type Props = {
     card: CardDetail;
-    student: StudentDetail;
+    holder: HolderDetail;
     events: EventRow[];
     otherCards: CardDetail[];
-    options: { studentTypes: Option[]; templates: Option[] };
+    options: {
+        studentTypes: Option[];
+        templates: Option[];
+        staffCategories: Option[];
+    };
     portal: { name: string; canUpdatePhoto: boolean };
+    signatures: Signatures;
 };
 
 function Field({
@@ -101,6 +107,35 @@ function Field({
             >
                 {value || '—'}
             </dd>
+        </div>
+    );
+}
+
+function Choice({
+    name,
+    options,
+    value,
+}: {
+    name: string;
+    options: Option[];
+    value: string | null;
+}) {
+    return (
+        <div className="flex flex-wrap gap-2">
+            {options.map((o) => (
+                <label key={o.value} className="cursor-pointer">
+                    <input
+                        type="radio"
+                        name={name}
+                        value={o.value}
+                        defaultChecked={value === o.value}
+                        className="peer sr-only"
+                    />
+                    <span className="inline-flex rounded-lg border px-3 py-1.5 text-sm font-medium text-muted-foreground transition-all peer-checked:border-navy-500 peer-checked:bg-navy-50 peer-checked:text-navy-800 peer-focus-visible:ring-2 peer-focus-visible:ring-ring dark:peer-checked:bg-navy-800 dark:peer-checked:text-white">
+                        {o.label}
+                    </span>
+                </label>
+            ))}
         </div>
     );
 }
@@ -163,45 +198,55 @@ function Steps({ card }: { card: CardDetail }) {
 
 export default function CardShow({
     card,
-    student,
+    holder,
     events,
     otherCards,
     options,
     portal,
+    signatures,
 }: Props) {
     const { auth } = usePage().props;
     const photo = useCardPhoto(card);
     const [confirmDelete, setConfirmDelete] = useState(false);
+    const isStaff = holder.type === 'staff';
     const T = TEMPLATES[card.template];
     const data: CardData = {
-        surname: student.surname,
-        firstName: student.first_name,
-        middleName: student.middle_name,
-        department: student.department,
-        faculty: student.faculty,
-        matric: student.matric_no,
-        programme: student.programme,
+        surname: holder.surname,
+        firstName: holder.first_name,
+        middleName: holder.middle_name,
+        department: holder.department,
+        faculty: holder.faculty,
+        matric: isStaff ? null : holder.id_number,
+        staffNo: isStaff ? holder.id_number : null,
+        designation: holder.designation,
+        programme: holder.programme,
+        studentType: holder.student_type,
         validUntil: card.valid_until,
     };
     const adjust = card.framing ?? DEFAULT_ADJUST;
+    const source = isStaff ? 'staff records' : 'student portal';
 
     return (
         <>
-            <Head title={student.full_name} />
+            <Head title={holder.full_name} />
             <div className="mx-auto w-full max-w-7xl space-y-6 p-4 md:p-8">
                 {/* header */}
                 <section className="overflow-hidden rounded-3xl border bg-card shadow-[0_1px_2px_rgba(20,24,70,0.04)]">
                     <div className="brand-wash flex flex-col gap-6 p-6 md:flex-row md:items-center md:p-8">
                         <StudentAvatar
                             src={card.photo_url}
-                            name={student.full_name}
+                            name={holder.full_name}
                             className="size-24 rounded-2xl text-2xl shadow-md ring-4 ring-white dark:ring-navy-900"
                         />
                         <div className="min-w-0 flex-1 space-y-2">
                             <div className="flex flex-wrap items-center gap-2">
+                                <CategoryBadge
+                                    category={card.template}
+                                    label={card.template_label}
+                                />
                                 <StatusBadge status={card.status} />
                                 <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
-                                    {card.template_label} card · {card.session}
+                                    Session {card.session}
                                 </span>
                                 {card.print_count > 1 && (
                                     <span className="rounded-full bg-gold-100 px-2.5 py-0.5 text-xs font-semibold text-gold-700">
@@ -210,14 +255,17 @@ export default function CardShow({
                                 )}
                             </div>
                             <h1 className="truncate text-2xl font-bold tracking-tight text-navy-900 md:text-3xl dark:text-white">
-                                {student.full_name}
+                                {holder.full_name}
                             </h1>
                             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                                 <span className="font-mono font-semibold text-navy-700 dark:text-navy-200">
-                                    {student.matric_no}
+                                    {holder.id_number}
                                 </span>
-                                <span>{student.department}</span>
-                                <span>{student.faculty}</span>
+                                {isStaff && holder.designation && (
+                                    <span>{holder.designation}</span>
+                                )}
+                                <span>{holder.department}</span>
+                                <span>{holder.faculty}</span>
                             </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
@@ -260,7 +308,7 @@ export default function CardShow({
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent
                                     align="end"
-                                    className="w-60"
+                                    className="w-64"
                                 >
                                     <DropdownMenuItem
                                         onSelect={() =>
@@ -271,8 +319,7 @@ export default function CardShow({
                                             )
                                         }
                                     >
-                                        <RefreshCw /> Refresh from student
-                                        portal
+                                        <RefreshCw /> Refresh from the {source}
                                     </DropdownMenuItem>
                                     {card.has_photo && (
                                         <DropdownMenuItem asChild>
@@ -295,8 +342,8 @@ export default function CardShow({
                                                     )
                                                 }
                                             >
-                                                <CloudUpload /> Update portal
-                                                picture
+                                                <CloudUpload /> Update picture
+                                                on the {source}
                                             </DropdownMenuItem>
                                         )}
                                     {card.print_count > 0 &&
@@ -340,8 +387,21 @@ export default function CardShow({
                 <div className="grid gap-6 xl:grid-cols-[1fr_400px]">
                     <div className="space-y-6">
                         <Panel
-                            title="Student bio data"
-                            description={`From ${portal.name}${student.portal_synced_at ? ` · synced ${timeAgo(student.portal_synced_at)}` : ''}`}
+                            title={
+                                isStaff ? 'Staff details' : 'Student bio data'
+                            }
+                            description={
+                                <>
+                                    From {portal.name}
+                                    {holder.portal_synced_at && (
+                                        <>
+                                            {' '}
+                                            · synced{' '}
+                                            {timeAgo(holder.portal_synced_at)}
+                                        </>
+                                    )}
+                                </>
+                            }
                             actions={
                                 <Button
                                     variant="ghost"
@@ -359,60 +419,98 @@ export default function CardShow({
                             }
                         >
                             <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
-                                <Field
-                                    label="Surname"
-                                    value={student.surname}
-                                />
+                                <Field label="Surname" value={holder.surname} />
                                 <Field
                                     label="First name"
-                                    value={student.first_name}
+                                    value={holder.first_name}
                                 />
                                 <Field
                                     label="Middle name"
-                                    value={student.middle_name}
+                                    value={holder.middle_name}
                                 />
                                 <Field
-                                    label="Faculty"
-                                    value={student.faculty}
-                                    wide
+                                    label={holder.number_label}
+                                    value={holder.id_number}
+                                    mono
                                 />
-                                <Field
-                                    label="Department"
-                                    value={student.department}
-                                />
-                                <Field
-                                    label="Programme"
-                                    value={student.programme}
-                                />
-                                <Field label="Level" value={student.level} />
-                                <Field label="Sex" value={student.sex} />
+                                {isStaff ? (
+                                    <>
+                                        <Field
+                                            label="Designation"
+                                            value={holder.designation}
+                                        />
+                                        <Field
+                                            label="Staff category"
+                                            value={holder.staff_category_label}
+                                        />
+                                        <Field
+                                            label="Faculty / directorate"
+                                            value={holder.faculty}
+                                            wide
+                                        />
+                                        <Field
+                                            label="Department / unit"
+                                            value={holder.department}
+                                        />
+                                    </>
+                                ) : (
+                                    <>
+                                        <Field
+                                            label="Programme"
+                                            value={holder.programme}
+                                        />
+                                        <Field
+                                            label="Level"
+                                            value={holder.level}
+                                        />
+                                        <Field
+                                            label="Faculty"
+                                            value={holder.faculty}
+                                            wide
+                                        />
+                                        <Field
+                                            label="Department"
+                                            value={holder.department}
+                                        />
+                                    </>
+                                )}
+                                <Field label="Sex" value={holder.sex} />
                                 <Field
                                     label="Date of birth"
                                     value={
-                                        student.date_of_birth
-                                            ? formatDate(student.date_of_birth)
+                                        holder.date_of_birth
+                                            ? formatDate(holder.date_of_birth)
                                             : null
                                     }
                                 />
                                 <Field
                                     label="Phone"
-                                    value={student.phone}
+                                    value={holder.phone}
                                     mono
                                 />
                                 <Field
                                     label="Email"
-                                    value={student.email}
+                                    value={holder.email}
                                     wide
                                 />
+                                {!isStaff && (
+                                    <>
+                                        <Field
+                                            label="Country"
+                                            value={holder.country}
+                                        />
+                                        <Field
+                                            label="State"
+                                            value={holder.state}
+                                        />
+                                        <Field label="LGA" value={holder.lga} />
+                                    </>
+                                )}
                                 <Field
-                                    label="Country"
-                                    value={student.country}
-                                />
-                                <Field label="State" value={student.state} />
-                                <Field label="LGA" value={student.lga} />
-                                <Field
-                                    label="Contact address"
-                                    value={student.address}
+                                    label={
+                                        isStaff ? 'Address' : 'Contact address'
+                                    }
+                                    value={holder.address}
                                     wide
                                 />
                             </dl>
@@ -420,7 +518,7 @@ export default function CardShow({
 
                         <Panel
                             title="Card details"
-                            description="Correct these here if the portal is wrong. Bio data above is changed on the student portal."
+                            description={`Correct these here if the ${source} ${isStaff ? 'are' : 'is'} wrong. The details above are changed on the ${source}.`}
                         >
                             <Form
                                 {...update.form(card.id)}
@@ -430,72 +528,79 @@ export default function CardShow({
                                 {({ processing, errors }) => (
                                     <>
                                         <div className="grid gap-6 md:grid-cols-2">
+                                            {isStaff ? (
+                                                <fieldset className="space-y-2">
+                                                    <legend className="text-sm font-medium">
+                                                        Staff category
+                                                    </legend>
+                                                    <Choice
+                                                        name="staff_category"
+                                                        options={
+                                                            options.staffCategories
+                                                        }
+                                                        value={
+                                                            holder.staff_category
+                                                        }
+                                                    />
+                                                    <InputError
+                                                        message={
+                                                            errors.staff_category
+                                                        }
+                                                    />
+                                                </fieldset>
+                                            ) : (
+                                                <fieldset className="space-y-2">
+                                                    <legend className="text-sm font-medium">
+                                                        Student type
+                                                    </legend>
+                                                    <Choice
+                                                        name="student_type"
+                                                        options={
+                                                            options.studentTypes
+                                                        }
+                                                        value={
+                                                            holder.student_type
+                                                        }
+                                                    />
+                                                    <InputError
+                                                        message={
+                                                            errors.student_type
+                                                        }
+                                                    />
+                                                </fieldset>
+                                            )}
                                             <fieldset className="space-y-2">
                                                 <legend className="text-sm font-medium">
-                                                    Student type
+                                                    Card category
                                                 </legend>
-                                                <div className="flex flex-wrap gap-2">
-                                                    {options.studentTypes.map(
-                                                        (o) => (
-                                                            <label
-                                                                key={o.value}
-                                                                className="cursor-pointer"
-                                                            >
-                                                                <input
-                                                                    type="radio"
-                                                                    name="student_type"
-                                                                    value={
-                                                                        o.value
-                                                                    }
-                                                                    defaultChecked={
-                                                                        student.student_type ===
-                                                                        o.value
-                                                                    }
-                                                                    className="peer sr-only"
-                                                                />
-                                                                <span className="inline-flex rounded-lg border px-3 py-1.5 text-sm font-medium text-muted-foreground transition-all peer-checked:border-navy-500 peer-checked:bg-navy-50 peer-checked:text-navy-800 peer-focus-visible:ring-2 peer-focus-visible:ring-ring dark:peer-checked:bg-navy-800 dark:peer-checked:text-white">
-                                                                    {o.label}
-                                                                </span>
-                                                            </label>
-                                                        ),
-                                                    )}
-                                                </div>
-                                                <InputError
-                                                    message={
-                                                        errors.student_type
-                                                    }
-                                                />
-                                            </fieldset>
-                                            <fieldset className="space-y-2">
-                                                <legend className="text-sm font-medium">
-                                                    Card design
-                                                </legend>
-                                                <div className="flex flex-wrap gap-2">
-                                                    {options.templates.map(
-                                                        (o) => (
-                                                            <label
-                                                                key={o.value}
-                                                                className="cursor-pointer"
-                                                            >
-                                                                <input
-                                                                    type="radio"
-                                                                    name="template"
-                                                                    value={
-                                                                        o.value
-                                                                    }
-                                                                    defaultChecked={
-                                                                        card.template ===
-                                                                        o.value
-                                                                    }
-                                                                    className="peer sr-only"
-                                                                />
-                                                                <span className="inline-flex rounded-lg border px-3 py-1.5 text-sm font-medium text-muted-foreground transition-all peer-checked:border-navy-500 peer-checked:bg-navy-50 peer-checked:text-navy-800 peer-focus-visible:ring-2 peer-focus-visible:ring-ring dark:peer-checked:bg-navy-800 dark:peer-checked:text-white">
-                                                                    {o.label}
-                                                                </span>
-                                                            </label>
-                                                        ),
-                                                    )}
-                                                </div>
+                                                {options.templates.length >
+                                                1 ? (
+                                                    <Choice
+                                                        name="template"
+                                                        options={
+                                                            options.templates
+                                                        }
+                                                        value={card.template}
+                                                    />
+                                                ) : (
+                                                    <>
+                                                        <input
+                                                            type="hidden"
+                                                            name="template"
+                                                            value={
+                                                                card.template
+                                                            }
+                                                        />
+                                                        <CategoryBadge
+                                                            category={
+                                                                card.template
+                                                            }
+                                                            label={
+                                                                card.template_label
+                                                            }
+                                                        />
+                                                    </>
+                                                )}
                                                 <InputError
                                                     message={errors.template}
                                                 />
@@ -517,58 +622,81 @@ export default function CardShow({
                                                     message={errors.valid_until}
                                                 />
                                             </div>
-                                            <div className="grid gap-1.5">
-                                                <Label htmlFor="graduation_year">
-                                                    Graduation year
-                                                </Label>
-                                                <Input
-                                                    id="graduation_year"
-                                                    name="graduation_year"
-                                                    defaultValue={
-                                                        student.graduation_year ??
-                                                        ''
-                                                    }
-                                                />
-                                            </div>
-                                            <div className="grid gap-1.5">
-                                                <Label htmlFor="guardian_phone">
-                                                    Guardian phone
-                                                </Label>
-                                                <Input
-                                                    id="guardian_phone"
-                                                    name="guardian_phone"
-                                                    defaultValue={
-                                                        student.guardian_phone ??
-                                                        ''
-                                                    }
-                                                />
-                                            </div>
-                                            <div className="grid gap-1.5 md:col-span-1">
-                                                <Label htmlFor="guardian_name">
-                                                    Name of guardian
-                                                </Label>
-                                                <Input
-                                                    id="guardian_name"
-                                                    name="guardian_name"
-                                                    defaultValue={
-                                                        student.guardian_name ??
-                                                        ''
-                                                    }
-                                                />
-                                            </div>
-                                            <div className="grid gap-1.5 md:col-span-2">
-                                                <Label htmlFor="guardian_address">
-                                                    Guardian address
-                                                </Label>
-                                                <Input
-                                                    id="guardian_address"
-                                                    name="guardian_address"
-                                                    defaultValue={
-                                                        student.guardian_address ??
-                                                        ''
-                                                    }
-                                                />
-                                            </div>
+                                            {isStaff ? (
+                                                <div className="grid gap-1.5 md:col-span-2">
+                                                    <Label htmlFor="designation">
+                                                        Designation
+                                                    </Label>
+                                                    <Input
+                                                        id="designation"
+                                                        name="designation"
+                                                        defaultValue={
+                                                            holder.designation ??
+                                                            ''
+                                                        }
+                                                    />
+                                                    <InputError
+                                                        message={
+                                                            errors.designation
+                                                        }
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <div className="grid gap-1.5">
+                                                        <Label htmlFor="graduation_year">
+                                                            Graduation year
+                                                        </Label>
+                                                        <Input
+                                                            id="graduation_year"
+                                                            name="graduation_year"
+                                                            defaultValue={
+                                                                holder.graduation_year ??
+                                                                ''
+                                                            }
+                                                        />
+                                                    </div>
+                                                    <div className="grid gap-1.5">
+                                                        <Label htmlFor="guardian_phone">
+                                                            Guardian phone
+                                                        </Label>
+                                                        <Input
+                                                            id="guardian_phone"
+                                                            name="guardian_phone"
+                                                            defaultValue={
+                                                                holder.guardian_phone ??
+                                                                ''
+                                                            }
+                                                        />
+                                                    </div>
+                                                    <div className="grid gap-1.5">
+                                                        <Label htmlFor="guardian_name">
+                                                            Name of guardian
+                                                        </Label>
+                                                        <Input
+                                                            id="guardian_name"
+                                                            name="guardian_name"
+                                                            defaultValue={
+                                                                holder.guardian_name ??
+                                                                ''
+                                                            }
+                                                        />
+                                                    </div>
+                                                    <div className="grid gap-1.5 md:col-span-2">
+                                                        <Label htmlFor="guardian_address">
+                                                            Guardian address
+                                                        </Label>
+                                                        <Input
+                                                            id="guardian_address"
+                                                            name="guardian_address"
+                                                            defaultValue={
+                                                                holder.guardian_address ??
+                                                                ''
+                                                            }
+                                                        />
+                                                    </div>
+                                                </>
+                                            )}
                                             <div className="grid gap-1.5 md:col-span-3">
                                                 <Label htmlFor="notes">
                                                     Notes
@@ -612,6 +740,7 @@ export default function CardShow({
                                         data={data}
                                         photo={photo}
                                         adjust={adjust}
+                                        signatures={signatures}
                                     />
                                 </ScaledCard>
                                 <span className="text-xs font-medium text-muted-foreground">
@@ -624,6 +753,7 @@ export default function CardShow({
                                         data={data}
                                         photo={photo}
                                         adjust={adjust}
+                                        signatures={signatures}
                                     />
                                 </ScaledCard>
                                 <span className="text-xs font-medium text-muted-foreground">
@@ -649,7 +779,11 @@ export default function CardShow({
                                         wide
                                     />
                                     <Field
-                                        label="Student portal"
+                                        label={
+                                            isStaff
+                                                ? 'Staff records'
+                                                : 'Student portal'
+                                        }
                                         value={
                                             card.portal_photo_synced_at
                                                 ? `Updated ${timeAgo(card.portal_photo_synced_at)}`
@@ -718,7 +852,7 @@ export default function CardShow({
                     <DialogHeader>
                         <DialogTitle>Delete this card record?</DialogTitle>
                         <DialogDescription>
-                            The photo and card for {student.full_name} (
+                            The photo and card for {holder.full_name} (
                             {card.session}) are removed. The history in Records
                             is kept. This cannot be undone.
                         </DialogDescription>
@@ -743,6 +877,6 @@ export default function CardShow({
 CardShow.layout = {
     breadcrumbs: [
         { title: 'Card status', href: index() },
-        { title: 'Student record', href: '#' },
+        { title: 'Record', href: '#' },
     ],
 };

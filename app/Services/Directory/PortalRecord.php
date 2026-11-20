@@ -1,30 +1,35 @@
 <?php
 
-namespace App\Services\StudentDirectory;
+namespace App\Services\Directory;
 
 use App\Enums\StudentType;
 use Carbon\CarbonImmutable;
 use Throwable;
 
 /**
- * One student as returned by any connector, normalised to this app's fields.
+ * One cardholder as returned by any connection, normalised to this app's fields.
  */
 final readonly class PortalRecord
 {
-    /** Fields copied into the local `students` table. */
+    /** Fields copied into the local `cardholders` table. */
     public const FIELDS = [
-        'matric_no', 'surname', 'first_name', 'middle_name', 'email', 'phone',
+        'id_number', 'surname', 'first_name', 'middle_name', 'email', 'phone',
         'date_of_birth', 'sex', 'country', 'state', 'lga', 'address',
-        'faculty', 'department', 'programme', 'level', 'student_type',
-        'graduation_year', 'guardian_name', 'guardian_phone', 'guardian_address',
+        'faculty', 'department',
+        // students
+        'programme', 'level', 'student_type', 'graduation_year',
+        'guardian_name', 'guardian_phone', 'guardian_address',
+        // staff
+        'designation', 'staff_category',
     ];
 
     /** @param array<string, string|null> $attributes */
     private function __construct(public array $attributes) {}
 
-    public static function normaliseMatric(string $matric): string
+    /** "scn/csc/ 230101" becomes "SCN/CSC/230101". */
+    public static function normaliseId(string $id): string
     {
-        return strtoupper(preg_replace('/\s+/', '', trim($matric)) ?? '');
+        return strtoupper(preg_replace('/\s+/', '', trim($id)) ?? '');
     }
 
     /** @param array<string, mixed> $raw already mapped to this app's field names */
@@ -37,12 +42,15 @@ final readonly class PortalRecord
             $out[$field] = $clean($raw[$field] ?? null);
         }
 
-        $out['matric_no'] = self::normaliseMatric((string) $out['matric_no']);
+        $out['id_number'] = self::normaliseId((string) $out['id_number']);
         $out['student_type'] = StudentType::fromPortal($out['student_type'])?->value;
+        if ($out['staff_category'] !== null) {
+            $out['staff_category'] = str_replace([' ', '-'], '_', strtolower($out['staff_category']));
+        }
 
         if ($out['date_of_birth'] !== null) {
             try {
-                $out['date_of_birth'] = CarbonImmutable::parse($out['date_of_birth'])->toDateString();
+                $out['date_of_birth'] = CarbonImmutable::parse(str_replace('/', '-', $out['date_of_birth']))->toDateString();
             } catch (Throwable) {
                 $out['date_of_birth'] = null;
             }
@@ -62,13 +70,13 @@ final readonly class PortalRecord
         return $this->attributes;
     }
 
-    public function matric(): string
+    public function idNumber(): string
     {
-        return (string) $this->attributes['matric_no'];
+        return (string) $this->attributes['id_number'];
     }
 
     public function isComplete(): bool
     {
-        return $this->attributes['matric_no'] && $this->attributes['surname'] && $this->attributes['first_name'];
+        return $this->attributes['id_number'] && $this->attributes['surname'] && $this->attributes['first_name'];
     }
 }

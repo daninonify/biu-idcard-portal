@@ -65,7 +65,7 @@ export function AppSidebar() {
                     icon: LayoutDashboard,
                 },
                 {
-                    title: 'Student lookup',
+                    title: 'Lookup',
                     href: lookup().url,
                     icon: ScanSearch,
                 },

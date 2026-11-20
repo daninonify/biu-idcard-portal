@@ -1,8 +1,18 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ListChecks, Search, X } from 'lucide-react';
+import {
+    Briefcase,
+    GraduationCap,
+    Layers,
+    ListChecks,
+    School,
+    Search,
+    X,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Pagination } from '@/components/portal/pagination';
 import {
+    CategoryBadge,
     EmptyState,
     PageHeader,
     StatusBadge,
@@ -13,39 +23,54 @@ import { cn } from '@/lib/utils';
 import { index, show } from '@/routes/cards';
 import type { CardRow, Paginated } from '@/types/portal';
 
-type Filter = 'pending' | 'completed' | 'all';
+type StatusFilter = 'pending' | 'completed' | 'all';
+
+type Filters = {
+    category: string;
+    status: StatusFilter;
+    q: string;
+    session: string;
+};
 
 type Props = {
     cards: Paginated<CardRow>;
-    filters: { status: Filter; q: string; session: string };
+    filters: Filters;
     sessions: string[];
-    totals: Record<Filter, number>;
+    categories: { value: string; label: string; count: number }[];
+    totals: Record<StatusFilter, number>;
 };
 
-const TABS: { key: Filter; label: string }[] = [
+const STATUS_TABS: { key: StatusFilter; label: string }[] = [
     { key: 'pending', label: 'Pending' },
     { key: 'completed', label: 'Completed' },
     { key: 'all', label: 'All' },
 ];
 
-/** "Card processing status" from the legacy system, with live search. */
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+    all: Layers,
+    ug: GraduationCap,
+    pg: School,
+    staff: Briefcase,
+};
+
+/** "Card processing status": by category, then Pending / Completed / All, with live search. */
 export default function CardsIndex({
     cards,
     filters,
     sessions,
+    categories,
     totals,
 }: Props) {
     const [q, setQ] = useState(filters.q);
     const first = useRef(true);
 
-    const go = (patch: Partial<Props['filters']>) =>
+    const go = (patch: Partial<Filters>) =>
         router.get(
             index.url(),
             { ...filters, ...patch, q: patch.q ?? q },
             { preserveState: true, preserveScroll: true, replace: true },
         );
 
-    // search as you type
     useEffect(() => {
         if (first.current) {
             first.current = false;
@@ -58,14 +83,25 @@ export default function CardsIndex({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [q]);
 
+    const categoryLabel =
+        categories.find((c) => c.value === filters.category)?.label ??
+        'All categories';
+    const statusWord =
+        filters.status === 'all'
+            ? ''
+            : filters.status === 'pending'
+              ? 'pending '
+              : 'completed ';
+    const isStaffView = filters.category === 'staff';
+
     return (
         <>
             <Head title="Card status" />
             <div className="mx-auto w-full max-w-7xl space-y-6 p-4 md:p-8">
                 <PageHeader
                     eyebrow="Card processing status"
-                    title={`${totals[filters.status].toLocaleString()} ${filters.status === 'all' ? 'cards' : filters.status === 'pending' ? 'pending cards' : 'completed cards'}`}
-                    description="Pending covers students still awaiting a photo and photos ready to print. Completed cards have been printed."
+                    title={`${totals[filters.status].toLocaleString()} ${statusWord}${filters.category === 'all' ? 'cards' : `${categoryLabel} cards`}`}
+                    description="Pending covers cards still awaiting a photo and photos ready to print. Completed cards have been printed."
                     actions={
                         sessions.length > 0 && (
                             <select
@@ -87,10 +123,53 @@ export default function CardsIndex({
                     }
                 />
 
+                {/* category tabs */}
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    {categories.map((c) => {
+                        const Icon = CATEGORY_ICONS[c.value] ?? Layers;
+                        const active = filters.category === c.value;
+
+                        return (
+                            <button
+                                key={c.value}
+                                onClick={() => go({ category: c.value })}
+                                className={cn(
+                                    'flex items-center gap-3 rounded-2xl border bg-card p-4 text-left transition-all',
+                                    active
+                                        ? 'border-navy-500 ring-4 ring-navy-500/10 dark:border-gold-400 dark:ring-gold-400/10'
+                                        : 'hover:border-navy-300',
+                                )}
+                            >
+                                <div
+                                    className={cn(
+                                        'grid size-10 shrink-0 place-items-center rounded-xl',
+                                        active
+                                            ? 'bg-navy-900 text-gold-300'
+                                            : 'bg-muted text-muted-foreground',
+                                    )}
+                                >
+                                    <Icon className="size-5" />
+                                </div>
+                                <div className="min-w-0">
+                                    <div className="truncate text-sm font-semibold text-navy-900 dark:text-white">
+                                        {c.label}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground tabular-nums">
+                                        {c.count}{' '}
+                                        {filters.status === 'all'
+                                            ? 'cards'
+                                            : filters.status}
+                                    </div>
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
+
                 <div className="rounded-2xl border bg-card shadow-[0_1px_2px_rgba(20,24,70,0.04)]">
                     <div className="flex flex-col gap-3 border-b p-4 md:flex-row md:items-center md:justify-between">
                         <div className="inline-flex rounded-xl bg-muted p-1">
-                            {TABS.map((t) => (
+                            {STATUS_TABS.map((t) => (
                                 <button
                                     key={t.key}
                                     onClick={() => go({ status: t.key })}
@@ -120,7 +199,7 @@ export default function CardsIndex({
                             <input
                                 value={q}
                                 onChange={(e) => setQ(e.target.value)}
-                                placeholder="Search matric no, name, phone or email"
+                                placeholder="Search matric / staff no, name, phone or email"
                                 className="h-10 w-full rounded-xl border border-input bg-background pr-9 pl-9 text-sm outline-none focus:border-navy-400 focus:ring-4 focus:ring-navy-500/10"
                             />
                             {q && (
@@ -139,14 +218,12 @@ export default function CardsIndex({
                         <EmptyState
                             icon={ListChecks}
                             title={
-                                filters.q
-                                    ? 'No matching students'
-                                    : 'Nothing here yet'
+                                filters.q ? 'No matches' : 'Nothing here yet'
                             }
                             description={
                                 filters.q
-                                    ? 'Try a different matric number or name.'
-                                    : 'Look a student up to start their card.'
+                                    ? 'Try a different number or name.'
+                                    : 'Look a student or staff member up to start their card.'
                             }
                         />
                     ) : (
@@ -154,15 +231,26 @@ export default function CardsIndex({
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b bg-muted/40 text-left text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                                        <th className="px-5 py-3">Student</th>
+                                        <th className="px-5 py-3">
+                                            Cardholder
+                                        </th>
+                                        {filters.category === 'all' && (
+                                            <th className="px-3 py-3">
+                                                Category
+                                            </th>
+                                        )}
                                         <th className="hidden px-3 py-3 md:table-cell">
                                             Phone
                                         </th>
                                         <th className="hidden px-3 py-3 lg:table-cell">
-                                            Faculty / department
+                                            {isStaffView
+                                                ? 'Directorate / unit'
+                                                : 'Faculty / department'}
                                         </th>
                                         <th className="hidden px-3 py-3 sm:table-cell">
-                                            Type
+                                            {isStaffView
+                                                ? 'Designation'
+                                                : 'Type'}
                                         </th>
                                         <th className="px-3 py-3">Status</th>
                                         <th className="hidden px-5 py-3 text-right xl:table-cell">
@@ -196,11 +284,19 @@ export default function CardsIndex({
                                                             {c.full_name}
                                                         </div>
                                                         <div className="font-mono text-xs text-muted-foreground">
-                                                            {c.matric_no}
+                                                            {c.id_number}
                                                         </div>
                                                     </div>
                                                 </Link>
                                             </td>
+                                            {filters.category === 'all' && (
+                                                <td className="px-3 py-3">
+                                                    <CategoryBadge
+                                                        category={c.category}
+                                                        label={c.category_label}
+                                                    />
+                                                </td>
+                                            )}
                                             <td className="hidden px-3 py-3 font-mono text-xs text-muted-foreground md:table-cell">
                                                 {c.phone ?? '—'}
                                             </td>
@@ -212,13 +308,9 @@ export default function CardsIndex({
                                                     {c.faculty}
                                                 </div>
                                             </td>
-                                            <td className="hidden px-3 py-3 sm:table-cell">
-                                                <div>
-                                                    {c.student_type_label ??
-                                                        '—'}
-                                                </div>
-                                                <div className="text-xs text-muted-foreground">
-                                                    {c.template_label}
+                                            <td className="hidden max-w-48 px-3 py-3 sm:table-cell">
+                                                <div className="truncate">
+                                                    {c.detail ?? '—'}
                                                 </div>
                                             </td>
                                             <td className="px-3 py-3">

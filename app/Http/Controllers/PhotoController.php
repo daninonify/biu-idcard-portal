@@ -9,7 +9,7 @@ use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Student photos live on a private disk and are only served to signed-in
+ * Cardholder photos live on a private disk and are only served to signed-in
  * staff, never from a public URL.
  */
 class PhotoController extends Controller
@@ -24,13 +24,13 @@ class PhotoController extends Controller
         ]);
     }
 
-    /** "Download picture file", named by matric number. */
+    /** "Download picture file", named by matric / staff number. */
     public function download(Request $request, IdCard $card, CardService $cards): Response
     {
         abort_unless($card->hasPhoto() && $cards->disk()->exists($card->photo_path), 404);
 
         $cards->log($card, $request->user(), 'photo_downloaded', 'Photo downloaded');
-        $name = Str::slug(str_replace('/', '-', $card->student->matric_no)).'.jpg';
+        $name = Str::slug(str_replace('/', '-', $card->cardholder->id_number)).'.jpg';
 
         return $cards->disk()->download($card->photo_path, strtoupper($name), ['Content-Type' => 'image/jpeg']);
     }

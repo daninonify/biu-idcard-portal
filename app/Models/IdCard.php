@@ -33,10 +33,10 @@ class IdCard extends Model
         ];
     }
 
-    /** @return BelongsTo<Student, $this> */
-    public function student(): BelongsTo
+    /** @return BelongsTo<Cardholder, $this> */
+    public function cardholder(): BelongsTo
     {
-        return $this->belongsTo(Student::class);
+        return $this->belongsTo(Cardholder::class);
     }
 
     /** @return BelongsTo<User, $this> */

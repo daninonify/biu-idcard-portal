@@ -12,6 +12,7 @@ use App\Http\Controllers\PortalPictureController;
 use App\Http\Controllers\PrintController;
 use App\Http\Controllers\RecordController;
 use App\Http\Controllers\RembgController;
+use App\Http\Controllers\SignatureController;
 use Illuminate\Support\Facades\Route;
 
 // Staff-only portal: the home page is the dashboard (or the login screen).
@@ -36,6 +37,12 @@ Route::middleware(['auth'])->group(function () {
     Route::post('cards/{card}/photo', [CaptureController::class, 'store'])->name('cards.photo.store');
     Route::get('cards/{card}/photo', [PhotoController::class, 'show'])->name('cards.photo');
     Route::get('cards/{card}/photo/download', [PhotoController::class, 'download'])->name('cards.photo.download');
+
+    // Holder signature (staff cards) and the registrar signatures from the old templates
+    Route::get('cards/{card}/signature', [SignatureController::class, 'show'])->name('cards.signature');
+    Route::post('cards/{card}/signature', [SignatureController::class, 'store'])->name('cards.signature.store');
+    Route::delete('cards/{card}/signature', [SignatureController::class, 'destroy'])->name('cards.signature.destroy');
+    Route::get('signatures/legacy/{variant}', [SignatureController::class, 'legacy'])->name('signatures.legacy');
 
     // Printing
     Route::get('cards/{card}/print', [PrintController::class, 'show'])->name('cards.print');

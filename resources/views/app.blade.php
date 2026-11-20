@@ -30,7 +30,7 @@
             }
         </style>
 
-        <link rel="icon" href="/brand/crest-light.png" type="image/png">
+        <link rel="icon" href="/brand/legacy/crest.png" type="image/png">
 
         @viteReactRefresh
         @vite(['resources/css/app.css', 'resources/js/app.tsx', "resources/js/pages/{$page['component']}.tsx"])

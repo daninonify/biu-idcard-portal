@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CameraPanel } from '@/components/capture/camera-panel';
+import { SignaturePanel } from '@/components/capture/signature-panel';
 import { DEFAULT_ADJUST, ScaledCard, TEMPLATES } from '@/components/id-card';
 import type {
     Adjust,
@@ -39,11 +40,11 @@ import type { EngineKey } from '@/lib/card-studio/segment';
 import { cn } from '@/lib/utils';
 import { index, show } from '@/routes/cards';
 import { store as storePhoto } from '@/routes/cards/photo';
-import type { CardDetail, StudentDetail } from '@/types/portal';
+import type { CardDetail, HolderDetail } from '@/types/portal';
 
 type Props = {
     card: CardDetail;
-    student: StudentDetail;
+    holder: HolderDetail;
     cardData: CardData;
     signatures: Signatures;
     defaults: { background: string };
@@ -71,7 +72,7 @@ let nextShot = 1;
 
 export default function Capture({
     card,
-    student,
+    holder,
     cardData,
     signatures,
     defaults,
@@ -265,7 +266,7 @@ export default function Capture({
 
     return (
         <>
-            <Head title={`Capture · ${student.full_name}`} />
+            <Head title={`Capture · ${holder.full_name}`} />
             <div className="mx-auto w-full max-w-[1500px] space-y-5 px-4 pt-4 md:px-6 md:pt-6">
                 {/* student strip */}
                 <div className="flex flex-wrap items-center gap-4 rounded-2xl border bg-card px-5 py-3">
@@ -276,13 +277,13 @@ export default function Capture({
                     </Button>
                     <div className="min-w-0 flex-1">
                         <div className="truncate text-lg font-bold text-navy-900 dark:text-white">
-                            {student.full_name}
+                            {holder.full_name}
                         </div>
                         <div className="truncate text-sm text-muted-foreground">
                             <span className="font-mono font-semibold text-navy-700 dark:text-navy-200">
-                                {student.matric_no}
+                                {holder.id_number}
                             </span>{' '}
-                            · {student.department} · {card.template_label} card
+                            · {holder.department} · {card.template_label} card
                         </div>
                     </div>
                     {card.has_photo && (
@@ -576,6 +577,18 @@ export default function Capture({
                                 </label>
                             </div>
                         </Panel>
+
+                        {card.template === 'staff' && (
+                            <Panel
+                                title="Holder's signature"
+                                description="Printed on the back of the staff card. Saved for later cards too."
+                            >
+                                <SignaturePanel
+                                    cardId={card.id}
+                                    current={signatures.holder ?? null}
+                                />
+                            </Panel>
+                        )}
                     </div>
 
                     {/* 4. live card */}

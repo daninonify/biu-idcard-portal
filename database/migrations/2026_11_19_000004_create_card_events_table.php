@@ -14,7 +14,8 @@ return new class extends Migration
         Schema::create('card_events', function (Blueprint $table) {
             $table->id();
             $table->foreignId('id_card_id')->nullable()->constrained()->nullOnDelete();
-            $table->string('matric_no')->nullable()->index();
+            $table->string('id_number')->nullable()->index();
+            $table->string('category')->nullable()->index();   // ug | pg | staff at the time
             $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
             $table->string('action')->index();
             $table->string('description')->nullable();

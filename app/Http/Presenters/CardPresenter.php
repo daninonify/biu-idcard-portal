@@ -2,9 +2,10 @@
 
 namespace App\Http\Presenters;
 
+use App\Enums\CardTemplate;
 use App\Models\CardEvent;
+use App\Models\Cardholder;
 use App\Models\IdCard;
-use App\Models\Student;
 use App\Services\CardService;
 
 /**
@@ -13,35 +14,51 @@ use App\Services\CardService;
  */
 final class CardPresenter
 {
+    private const STAFF_CATEGORIES = [
+        'academic' => 'Academic',
+        'non_academic' => 'Non-academic',
+        'contract' => 'Contract',
+    ];
+
     /** @return array<string, mixed> */
-    public static function student(Student $s): array
+    public static function holder(Cardholder $h): array
     {
         return [
-            'id' => $s->id,
-            'matric_no' => $s->matric_no,
-            'full_name' => $s->full_name,
-            'surname' => $s->surname,
-            'first_name' => $s->first_name,
-            'middle_name' => $s->middle_name,
-            'email' => $s->email,
-            'phone' => $s->phone,
-            'date_of_birth' => $s->date_of_birth?->toDateString(),
-            'sex' => $s->sex,
-            'country' => $s->country,
-            'state' => $s->state,
-            'lga' => $s->lga,
-            'address' => $s->address,
-            'faculty' => $s->faculty,
-            'department' => $s->department,
-            'programme' => $s->programme,
-            'level' => $s->level,
-            'student_type' => $s->student_type?->value,
-            'student_type_label' => $s->student_type?->label(),
-            'graduation_year' => $s->graduation_year,
-            'guardian_name' => $s->guardian_name,
-            'guardian_phone' => $s->guardian_phone,
-            'guardian_address' => $s->guardian_address,
-            'portal_synced_at' => $s->portal_synced_at?->toIso8601String(),
+            'id' => $h->id,
+            'type' => $h->type->value,
+            'type_label' => $h->type->label(),
+            'number_label' => $h->type->numberLabel(),
+            'id_number' => $h->id_number,
+            'full_name' => $h->full_name,
+            'surname' => $h->surname,
+            'first_name' => $h->first_name,
+            'middle_name' => $h->middle_name,
+            'email' => $h->email,
+            'phone' => $h->phone,
+            'date_of_birth' => $h->date_of_birth?->toDateString(),
+            'sex' => $h->sex,
+            'country' => $h->country,
+            'state' => $h->state,
+            'lga' => $h->lga,
+            'address' => $h->address,
+            'faculty' => $h->faculty,
+            'department' => $h->department,
+            // students
+            'programme' => $h->programme,
+            'level' => $h->level,
+            'student_type' => $h->student_type?->value,
+            'student_type_label' => $h->student_type?->label(),
+            'graduation_year' => $h->graduation_year,
+            'guardian_name' => $h->guardian_name,
+            'guardian_phone' => $h->guardian_phone,
+            'guardian_address' => $h->guardian_address,
+            // staff
+            'designation' => $h->designation,
+            'staff_category' => $h->staff_category,
+            'staff_category_label' => self::staffCategoryLabel($h->staff_category),
+            'has_signature' => $h->signature_path !== null,
+            'signature_captured_at' => $h->signature_captured_at?->toIso8601String(),
+            'portal_synced_at' => $h->portal_synced_at?->toIso8601String(),
         ];
     }
 
@@ -74,20 +91,25 @@ final class CardPresenter
         ];
     }
 
-    /** A table row: card + the student columns the list shows. */
+    /** A table row: card + the holder columns the lists show. */
     public static function row(IdCard $c): array
     {
-        $s = $c->student;
+        $h = $c->cardholder;
 
         return [
             'id' => $c->id,
-            'matric_no' => $s->matric_no,
-            'full_name' => $s->full_name,
-            'phone' => $s->phone,
-            'faculty' => $s->faculty,
-            'department' => $s->department,
-            'student_type_label' => $s->student_type?->label(),
-            'template_label' => $c->template->label(),
+            'holder_type' => $h->type->value,
+            'id_number' => $h->id_number,
+            'full_name' => $h->full_name,
+            'phone' => $h->phone,
+            'faculty' => $h->faculty,
+            'department' => $h->department,
+            // what the "type" column shows: student type, or the staff member's role
+            'detail' => $h->isStaff()
+                ? ($h->designation ?? self::staffCategoryLabel($h->staff_category))
+                : $h->student_type?->label(),
+            'category' => $c->template->value,
+            'category_label' => $c->template->label(),
             'status' => $c->status->value,
             'status_label' => $c->status->label(),
             'print_count' => $c->print_count,
@@ -101,13 +123,17 @@ final class CardPresenter
     /** @return array<string, mixed> */
     public static function event(CardEvent $e): array
     {
+        $category = $e->category ? CardTemplate::tryFrom($e->category) : null;
+
         return [
             'id' => $e->id,
             'action' => $e->action,
             'description' => $e->description,
-            'matric_no' => $e->matric_no,
+            'id_number' => $e->id_number,
+            'category' => $category?->value,
+            'category_label' => $category?->label(),
             'card_id' => $e->id_card_id,
-            'student_name' => $e->card?->student?->full_name,
+            'holder_name' => $e->card?->cardholder?->full_name,
             'user' => $e->user?->name,
             'ip_address' => $e->ip_address,
             'created_at' => $e->created_at?->toIso8601String(),
@@ -115,23 +141,43 @@ final class CardPresenter
     }
 
     /**
-     * What the card templates need, in the same shape as the original studio.
+     * What the card templates need.
      *
      * @return array<string, string|null>
      */
     public static function cardData(IdCard $c): array
     {
-        $s = $c->student;
+        $h = $c->cardholder;
 
         return [
-            'surname' => $s->surname,
-            'firstName' => $s->first_name,
-            'middleName' => $s->middle_name,
-            'department' => $s->department,
-            'faculty' => $s->faculty,
-            'matric' => $s->matric_no,
-            'programme' => $s->programme,
+            'surname' => $h->surname,
+            'firstName' => $h->first_name,
+            'middleName' => $h->middle_name,
+            'department' => $h->department,
+            'faculty' => $h->faculty,
+            'matric' => $h->isStaff() ? null : $h->id_number,
+            'staffNo' => $h->isStaff() ? $h->id_number : null,
+            'designation' => $h->designation,
+            'programme' => $h->programme,
+            'studentType' => $h->student_type?->value,
             'validUntil' => $c->valid_until,
         ];
+    }
+
+    public static function staffCategoryLabel(?string $category): ?string
+    {
+        return $category ? (self::STAFF_CATEGORIES[$category] ?? ucwords(str_replace('_', ' ', $category))) : null;
+    }
+
+    /** @return list<array{value: string, label: string}> */
+    public static function staffCategories(): array
+    {
+        return collect(self::STAFF_CATEGORIES)->map(fn ($label, $value) => compact('value', 'label'))->values()->all();
+    }
+
+    /** @return list<array{value: string, label: string}> */
+    public static function categories(): array
+    {
+        return collect(CardTemplate::cases())->map(fn (CardTemplate $t) => ['value' => $t->value, 'label' => $t->label()])->all();
     }
 }

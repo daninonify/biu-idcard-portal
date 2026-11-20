@@ -2,16 +2,24 @@ import type { CardData } from '@/components/id-card';
 
 export type CardStatus = 'pending' | 'captured' | 'printed';
 
+/** Card category = card design. */
+export type Category = 'ug' | 'pg' | 'staff';
+
+export type HolderType = 'student' | 'staff';
+
 /** A row in card lists (CardPresenter::row). */
 export type CardRow = {
     id: number;
-    matric_no: string;
+    holder_type: HolderType;
+    id_number: string;
     full_name: string;
     phone: string | null;
     faculty: string | null;
     department: string | null;
-    student_type_label: string | null;
-    template_label: string;
+    /** student type (Full time…) or the staff member's designation */
+    detail: string | null;
+    category: Category;
+    category_label: string;
     status: CardStatus;
     status_label: string;
     print_count: number;
@@ -19,6 +27,7 @@ export type CardRow = {
     portal_photo_synced_at: string | null;
     captured_at: string | null;
     updated_at: string | null;
+    can_send?: boolean;
 };
 
 export type Framing = {
@@ -32,7 +41,7 @@ export type Framing = {
 export type CardDetail = {
     id: number;
     session: string;
-    template: 'ug' | 'pg';
+    template: Category;
     template_label: string;
     status: CardStatus;
     status_label: string;
@@ -54,9 +63,13 @@ export type CardDetail = {
     updated_at: string | null;
 };
 
-export type StudentDetail = {
+/** A student or staff member (CardPresenter::holder). */
+export type HolderDetail = {
     id: number;
-    matric_no: string;
+    type: HolderType;
+    type_label: string;
+    number_label: string;
+    id_number: string;
     full_name: string;
     surname: string;
     first_name: string;
@@ -71,6 +84,7 @@ export type StudentDetail = {
     address: string | null;
     faculty: string | null;
     department: string | null;
+    // students
     programme: string | null;
     level: string | null;
     student_type: string | null;
@@ -79,6 +93,12 @@ export type StudentDetail = {
     guardian_name: string | null;
     guardian_phone: string | null;
     guardian_address: string | null;
+    // staff
+    designation: string | null;
+    staff_category: string | null;
+    staff_category_label: string | null;
+    has_signature: boolean;
+    signature_captured_at: string | null;
     portal_synced_at: string | null;
 };
 
@@ -86,9 +106,11 @@ export type EventRow = {
     id: number;
     action: string;
     description: string | null;
-    matric_no: string | null;
+    id_number: string | null;
+    category: Category | null;
+    category_label: string | null;
     card_id: number | null;
-    student_name: string | null;
+    holder_name: string | null;
     user: string | null;
     ip_address: string | null;
     created_at: string | null;

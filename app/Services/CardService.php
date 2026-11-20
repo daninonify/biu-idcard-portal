@@ -4,14 +4,15 @@ namespace App\Services;
 
 use App\Enums\CardStatus;
 use App\Enums\CardTemplate;
+use App\Enums\HolderType;
 use App\Models\CardEvent;
+use App\Models\Cardholder;
 use App\Models\IdCard;
 use App\Models\Setting;
-use App\Models\Student;
 use App\Models\User;
-use App\Services\StudentDirectory\PortalRecord;
-use App\Services\StudentDirectory\StudentDirectory;
-use App\Services\StudentDirectory\StudentDirectoryException;
+use App\Services\Directory\Directories;
+use App\Services\Directory\DirectoryException;
+use App\Services\Directory\PortalRecord;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -20,50 +21,53 @@ use InvalidArgumentException;
 
 class CardService
 {
-    public function __construct(private readonly StudentDirectory $directory) {}
+    public function __construct(private readonly Directories $directories) {}
 
     /**
-     * Find a student by matric number: the local copy if we have one (unless
-     * $refresh), otherwise the student portal. Null when the portal has no such student.
+     * Find a student (by matric no.) or staff member (by staff no.): the local
+     * copy if we have one (unless $refresh), otherwise the source system.
+     * Null when the source has no such person.
      *
-     * @throws StudentDirectoryException
+     * @throws DirectoryException
      */
-    public function lookup(string $matricNo, bool $refresh = false): ?Student
+    public function lookup(HolderType $type, string $idNumber, bool $refresh = false): ?Cardholder
     {
-        $matric = PortalRecord::normaliseMatric($matricNo);
-        $local = Student::query()->where('matric_no', $matric)->first();
+        $id = PortalRecord::normaliseId($idNumber);
+        $local = Cardholder::query()->where('type', $type)->where('id_number', $id)->first();
 
         if ($local && ! $refresh) {
             return $local;
         }
 
-        $record = $this->directory->find($matric);
+        $record = $this->directories->for($type)->find($id);
         if ($record === null || ! $record->isComplete()) {
-            return $local; // keep what we have if the portal no longer lists them
+            return $local; // keep what we have if the source no longer lists them
         }
 
-        return $this->import($record);
+        return $this->import($type, $record);
     }
 
-    public function import(PortalRecord $record): Student
+    public function import(HolderType $type, PortalRecord $record): Cardholder
     {
-        return Student::query()->updateOrCreate(
-            ['matric_no' => $record->matric()],
-            [...$record->toArray(), 'portal_synced_at' => now()],
+        return Cardholder::query()->updateOrCreate(
+            ['id_number' => $record->idNumber()],
+            [...$record->toArray(), 'type' => $type, 'portal_synced_at' => now()],
         );
     }
 
-    /** The student's card for the current session, created if needed. */
-    public function cardFor(Student $student, User $user): IdCard
+    /** The person's card for the current session, created if needed. */
+    public function cardFor(Cardholder $holder, User $user): IdCard
     {
         $session = (string) Setting::get('session');
 
         $card = IdCard::query()->firstOrCreate(
-            ['student_id' => $student->id, 'session' => $session],
+            ['cardholder_id' => $holder->id, 'session' => $session],
             [
-                'template' => CardTemplate::forProgramme($student->programme, $student->level),
+                'template' => CardTemplate::choose($holder->type, $holder->programme, $holder->level),
                 'status' => CardStatus::Pending,
-                'valid_until' => $student->graduation_year ?: Setting::get('valid_until'),
+                'valid_until' => $holder->isStaff()
+                    ? Setting::get('staff_valid_until')
+                    : ($holder->graduation_year ?: Setting::get('valid_until')),
             ],
         );
 
@@ -83,11 +87,12 @@ class CardService
             throw new InvalidArgumentException('The photo must be a JPEG image.');
         }
 
-        $student = $card->student;
+        $holder = $card->cardholder;
         $path = sprintf(
-            'photos/%s/%s-%s.jpg',
+            'photos/%s/%s/%s-%s.jpg',
             Str::slug($card->session),
-            Str::slug(str_replace('/', '-', $student->matric_no)),
+            $card->template->value,
+            Str::slug(str_replace('/', '-', $holder->id_number)),
             Str::lower(Str::random(8)),
         );
 
@@ -151,20 +156,26 @@ class CardService
         return $card;
     }
 
-    /** @throws StudentDirectoryException */
+    /**
+     * Send the photo back to where the person came from: the student portal
+     * for students, the staff records for staff.
+     *
+     * @throws DirectoryException
+     */
     public function pushPhotoToPortal(IdCard $card, User $user): void
     {
         if (! $card->hasPhoto()) {
-            throw new StudentDirectoryException('This card has no photo yet.');
+            throw new DirectoryException('This card has no photo yet.');
         }
-        if (! $this->directory->supportsPhotoUpdate()) {
-            throw new StudentDirectoryException('This student portal connection cannot receive pictures.');
+        $directory = $this->directories->for($card->cardholder->type);
+        if (! $directory->supportsPhotoUpdate()) {
+            throw new DirectoryException('The '.$directory->name().' connection cannot receive pictures.');
         }
 
-        $this->directory->updatePhoto($card->student->matric_no, (string) $this->disk()->get($card->photo_path));
+        $directory->updatePhoto($card->cardholder->id_number, (string) $this->disk()->get($card->photo_path));
 
         $card->forceFill(['portal_photo_synced_at' => now()])->save();
-        $this->log($card, $user, 'portal_photo_updated', 'Photo sent to the student portal');
+        $this->log($card, $user, 'portal_photo_updated', 'Photo sent to the '.($card->cardholder->isStaff() ? 'staff records' : 'student portal'));
     }
 
     public function deleteCard(IdCard $card, User $user): void
@@ -182,7 +193,8 @@ class CardService
     {
         return CardEvent::query()->create([
             'id_card_id' => $card?->id,
-            'matric_no' => $card?->student?->matric_no,
+            'id_number' => $card?->cardholder?->id_number,
+            'category' => $card?->template?->value,
             'user_id' => $user?->id,
             'action' => $action,
             'description' => $description,

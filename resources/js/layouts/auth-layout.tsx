@@ -54,7 +54,7 @@ export default function AuthLayout({
                 <div className="relative z-10 flex items-center gap-3 px-12 pt-28">
                     <div className="grid size-14 place-items-center rounded-2xl bg-white p-1 shadow-lg">
                         <img
-                            src="/brand/crest-light.png"
+                            src="/brand/legacy/crest.png"
                             alt=""
                             className="size-full object-contain"
                         />
@@ -110,7 +110,7 @@ export default function AuthLayout({
                 <div className="w-full max-w-sm">
                     <div className="mb-8 flex items-center gap-3 lg:hidden">
                         <img
-                            src="/brand/crest-light.png"
+                            src="/brand/legacy/crest.png"
                             alt=""
                             className="size-12 object-contain"
                         />

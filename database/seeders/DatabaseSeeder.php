@@ -33,7 +33,8 @@ class DatabaseSeeder extends Seeder
             'email_verified_at' => now(),
         ]);
 
-        if (config('idcard.directory.driver') === 'demo') {
+        // Demo cards only while both sources are the fictional demo directories
+        if (config('idcard.directory.student.driver') === 'demo' && config('idcard.directory.staff.driver') === 'demo') {
             $this->call(DemoCardSeeder::class);
         }
     }

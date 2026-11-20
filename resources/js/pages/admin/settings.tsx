@@ -20,14 +20,20 @@ type Props = {
     settings: {
         session: string;
         valid_until: string;
+        staff_valid_until: string;
         default_background: string;
         reprint_requires_reason: boolean;
         registrar_signature_url: string | null;
+        legacy_signature_urls: string[];
     };
     system: {
-        directory: string;
-        directory_driver: string;
-        can_update_photo: boolean;
+        directories: {
+            label: string;
+            name: string;
+            driver: string;
+            env: string;
+            can_update_photo: boolean;
+        }[];
         rembg_url: string;
         rembg_running: boolean;
         photo_disk: string;
@@ -100,7 +106,7 @@ export default function Settings({ settings, system }: Props) {
                                         </div>
                                         <div className="grid gap-1.5">
                                             <Label htmlFor="valid_until">
-                                                Default "valid until"
+                                                Student cards valid until
                                             </Label>
                                             <Input
                                                 id="valid_until"
@@ -115,6 +121,26 @@ export default function Settings({ settings, system }: Props) {
                                             </p>
                                             <InputError
                                                 message={errors.valid_until}
+                                            />
+                                        </div>
+                                        <div className="grid gap-1.5">
+                                            <Label htmlFor="staff_valid_until">
+                                                Staff cards valid until
+                                            </Label>
+                                            <Input
+                                                id="staff_valid_until"
+                                                name="staff_valid_until"
+                                                defaultValue={
+                                                    settings.staff_valid_until
+                                                }
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                Used for every new staff card.
+                                            </p>
+                                            <InputError
+                                                message={
+                                                    errors.staff_valid_until
+                                                }
                                             />
                                         </div>
                                         <div className="grid gap-1.5">
@@ -184,9 +210,18 @@ export default function Settings({ settings, system }: Props) {
                                                         className="max-h-16 max-w-44 object-contain"
                                                     />
                                                 ) : (
-                                                    <span className="text-xs text-muted-foreground">
-                                                        No signature
-                                                    </span>
+                                                    <div className="flex h-full w-full items-center justify-center gap-3 p-1">
+                                                        {settings.legacy_signature_urls.map(
+                                                            (u) => (
+                                                                <img
+                                                                    key={u}
+                                                                    src={u}
+                                                                    alt=""
+                                                                    className="h-full max-w-20 rotate-90 object-contain"
+                                                                />
+                                                            ),
+                                                        )}
+                                                    </div>
                                                 )}
                                             </div>
                                             <div className="space-y-2 text-sm">
@@ -208,9 +243,14 @@ export default function Settings({ settings, system }: Props) {
                                                     className="block text-sm file:mr-3 file:rounded-md file:border-0 file:bg-navy-900 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white"
                                                 />
                                                 <p className="text-xs text-muted-foreground">
-                                                    A transparent PNG of the
-                                                    official signature works
-                                                    best.
+                                                    {settings.registrar_signature_url
+                                                        ? 'This signature is printed on every student card.'
+                                                        : 'Now printing the signatures from the old card templates (one on full-time cards, one on the others). Upload the current registrar’s signature to replace both.'}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    A transparent PNG works
+                                                    best; draw it upright, it is
+                                                    turned to fit the card.
                                                 </p>
                                                 {settings.registrar_signature_url && (
                                                     <label className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -248,30 +288,31 @@ export default function Settings({ settings, system }: Props) {
                     </Panel>
 
                     <div className="space-y-6">
-                        <Panel title="Student portal">
-                            <div className="space-y-3 text-sm">
-                                <div className="flex items-start gap-3">
-                                    <Database className="mt-0.5 size-4 shrink-0 text-navy-500" />
-                                    <div>
-                                        <div className="font-medium">
-                                            {system.directory}
-                                        </div>
-                                        <div className="text-xs text-muted-foreground">
-                                            STUDENT_DIRECTORY=
-                                            {system.directory_driver}
+                        {system.directories.map((d) => (
+                            <Panel key={d.env} title={d.label}>
+                                <div className="space-y-3 text-sm">
+                                    <div className="flex items-start gap-3">
+                                        <Database className="mt-0.5 size-4 shrink-0 text-navy-500" />
+                                        <div>
+                                            <div className="font-medium">
+                                                {d.name}
+                                            </div>
+                                            <div className="text-xs text-muted-foreground">
+                                                {d.env}={d.driver}
+                                            </div>
                                         </div>
                                     </div>
+                                    <Status
+                                        ok={d.can_update_photo}
+                                        label={
+                                            d.can_update_photo
+                                                ? 'Can receive pictures'
+                                                : 'Read only'
+                                        }
+                                    />
                                 </div>
-                                <Status
-                                    ok={system.can_update_photo}
-                                    label={
-                                        system.can_update_photo
-                                            ? 'Can receive pictures'
-                                            : 'Read only'
-                                    }
-                                />
-                            </div>
-                        </Panel>
+                            </Panel>
+                        ))}
                         <Panel title="Offline engine (rembg)">
                             <div className="space-y-3 text-sm">
                                 <div className="flex items-start gap-3">

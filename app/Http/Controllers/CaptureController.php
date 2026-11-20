@@ -18,13 +18,13 @@ class CaptureController extends Controller
 {
     public function show(IdCard $card): Response
     {
-        $card->load('student');
+        $card->load('cardholder');
 
         return Inertia::render('cards/capture', [
             'card' => CardPresenter::card($card),
-            'student' => CardPresenter::student($card->student),
+            'holder' => CardPresenter::holder($card->cardholder),
             'cardData' => CardPresenter::cardData($card),
-            'signatures' => ['registrar' => Setting::get('registrar_signature') ? route('settings.signature') : null],
+            'signatures' => SignatureController::forCard($card),
             'defaults' => ['background' => Setting::get('default_background')],
             'rembgModels' => config('idcard.rembg.models'),
         ]);
@@ -57,7 +57,7 @@ class CaptureController extends Controller
             return back()->withErrors(['photo' => $e->getMessage()]);
         }
 
-        Toast::success('Photo saved for '.$card->student->full_name.'.');
+        Toast::success('Photo saved for '.$card->cardholder->full_name.'.');
 
         return $request->input('next') === 'print'
             ? to_route('cards.print', $card)

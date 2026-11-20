@@ -308,3 +308,32 @@ export function timeAgo(iso?: string | null): string {
 
     return `${Math.floor(v)} years ago`;
 }
+
+const CATEGORY: Record<string, string> = {
+    ug: 'bg-navy-50 text-navy-700 ring-navy-600/20 dark:bg-navy-400/15 dark:text-navy-200',
+    pg: 'bg-violet-50 text-violet-700 ring-violet-600/20 dark:bg-violet-400/15 dark:text-violet-200',
+    staff: 'bg-gold-50 text-gold-700 ring-gold-600/25 dark:bg-gold-400/15 dark:text-gold-300',
+};
+
+/** Undergraduate / Postgraduate / Staff, colour-coded the same everywhere. */
+export function CategoryBadge({
+    category,
+    label,
+    className,
+}: {
+    category: string;
+    label: string;
+    className?: string;
+}) {
+    return (
+        <span
+            className={cn(
+                'inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ring-1 ring-inset',
+                CATEGORY[category] ?? CATEGORY.ug,
+                className,
+            )}
+        >
+            {label}
+        </span>
+    );
+}

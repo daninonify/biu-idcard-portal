@@ -16,7 +16,12 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import { Pagination } from '@/components/portal/pagination';
-import { EmptyState, PageHeader, formatDateTime } from '@/components/portal/ui';
+import {
+    CategoryBadge,
+    EmptyState,
+    PageHeader,
+    formatDateTime,
+} from '@/components/portal/ui';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { records } from '@/routes';
@@ -25,6 +30,7 @@ import type { EventRow, Option, Paginated } from '@/types/portal';
 
 type Filters = {
     q: string;
+    category: string;
     action: string;
     user: string;
     from: string;
@@ -35,6 +41,7 @@ type Props = {
     events: Paginated<EventRow>;
     filters: Filters;
     actions: Option[];
+    categories: Option[];
     users: { id: number; name: string }[];
 };
 
@@ -93,7 +100,13 @@ const control =
     'h-9 rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50';
 
 /** "Records": every action taken in the portal, for accountability. */
-export default function Records({ events, filters, actions, users }: Props) {
+export default function Records({
+    events,
+    filters,
+    actions,
+    categories,
+    users,
+}: Props) {
     const [f, setF] = useState<Filters>(filters);
 
     const apply = (next: Filters) => {
@@ -123,7 +136,7 @@ export default function Records({ events, filters, actions, users }: Props) {
 
                 <div className="rounded-2xl border bg-card shadow-[0_1px_2px_rgba(20,24,70,0.04)]">
                     <form
-                        className="grid gap-3 border-b p-4 md:grid-cols-[1fr_auto_auto_auto_auto_auto]"
+                        className="grid gap-3 border-b p-4 md:grid-cols-[1fr_auto_auto_auto_auto_auto_auto]"
                         onSubmit={(e) => {
                             e.preventDefault();
                             apply(f);
@@ -136,10 +149,25 @@ export default function Records({ events, filters, actions, users }: Props) {
                                 onChange={(e) =>
                                     setF({ ...f, q: e.target.value })
                                 }
-                                placeholder="Matric no, name or description"
+                                placeholder="Matric / staff no, name or description"
                                 className={cn(control, 'w-full pl-9')}
                             />
                         </div>
+                        <select
+                            value={f.category}
+                            onChange={(e) =>
+                                apply({ ...f, category: e.target.value })
+                            }
+                            className={control}
+                            aria-label="Category"
+                        >
+                            <option value="">All categories</option>
+                            {categories.map((c) => (
+                                <option key={c.value} value={c.value}>
+                                    {c.label}
+                                </option>
+                            ))}
+                        </select>
                         <select
                             value={f.action}
                             onChange={(e) =>
@@ -224,7 +252,7 @@ export default function Records({ events, filters, actions, users }: Props) {
                                                 {e.description}
                                             </div>
                                             <div className="truncate text-xs text-muted-foreground">
-                                                {e.matric_no ? (
+                                                {e.id_number ? (
                                                     <>
                                                         {e.card_id ? (
                                                             <Link
@@ -233,21 +261,28 @@ export default function Records({ events, filters, actions, users }: Props) {
                                                                 )}
                                                                 className="font-mono hover:underline"
                                                             >
-                                                                {e.matric_no}
+                                                                {e.id_number}
                                                             </Link>
                                                         ) : (
                                                             <span className="font-mono">
-                                                                {e.matric_no}
+                                                                {e.id_number}
                                                             </span>
                                                         )}
-                                                        {e.student_name &&
-                                                            ` · ${e.student_name}`}
+                                                        {e.holder_name &&
+                                                            ` · ${e.holder_name}`}
                                                     </>
                                                 ) : (
                                                     'Portal-wide'
                                                 )}
                                             </div>
                                         </div>
+                                        {e.category && e.category_label && (
+                                            <CategoryBadge
+                                                category={e.category}
+                                                label={e.category_label}
+                                                className="hidden sm:inline-flex"
+                                            />
+                                        )}
                                         <div className="hidden text-right text-sm md:block">
                                             <div className="font-medium">
                                                 {e.user ?? 'System'}

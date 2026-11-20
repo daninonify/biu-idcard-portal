@@ -8,8 +8,9 @@ import {
     RotateCcw,
     Sparkles,
 } from 'lucide-react';
-import { MatricSearch } from '@/components/portal/matric-search';
+import { IdSearch } from '@/components/portal/id-search';
 import {
+    CategoryBadge,
     EmptyState,
     Panel,
     StatCard,
@@ -19,7 +20,15 @@ import {
 import { Button } from '@/components/ui/button';
 import { dashboard, records } from '@/routes';
 import { index as cardsIndex, print, show } from '@/routes/cards';
-import type { CardRow, EventRow } from '@/types/portal';
+import type { CardRow, Category, EventRow, HolderType } from '@/types/portal';
+
+type CategoryStats = {
+    value: Category;
+    label: string;
+    pending: number;
+    captured: number;
+    printed: number;
+};
 
 type Props = {
     session: string;
@@ -31,11 +40,12 @@ type Props = {
         captured_today: number;
         reprints: number;
     };
+    categories: CategoryStats[];
     trend: { date: string; label: string; printed: number }[];
     queue: CardRow[];
     activity: EventRow[];
-    directory: string;
-    demoMatrics: string[];
+    directories: Record<HolderType, string>;
+    demo: Record<HolderType, string[]>;
 };
 
 function greeting(): string {
@@ -47,12 +57,14 @@ function greeting(): string {
 export default function Dashboard({
     session,
     stats,
+    categories,
     trend,
     queue,
     activity,
-    directory,
-    demoMatrics,
+    directories,
+    demo,
 }: Props) {
+    const usingDemo = demo.student.length > 0 || demo.staff.length > 0;
     const { auth } = usePage().props;
     const total = stats.pending + stats.captured + stats.printed;
     const done = total ? Math.round((stats.printed / total) * 100) : 0;
@@ -81,17 +93,14 @@ export default function Dashboard({
                                 </h1>
                             </div>
                             <div className="rounded-2xl bg-white/95 p-2 text-foreground shadow-lg dark:bg-navy-950/80">
-                                <MatricSearch
-                                    size="lg"
-                                    autoFocus
-                                    hints={demoMatrics.slice(0, 4)}
-                                />
+                                <IdSearch size="lg" autoFocus hints={demo} />
                             </div>
-                            {demoMatrics.length > 0 && (
+                            {usingDemo && (
                                 <div className="flex items-center gap-1.5 text-xs text-white/60">
                                     <Sparkles className="size-3.5 text-gold-300" />{' '}
-                                    Using fictional demo students until the
-                                    student portal is connected.
+                                    Using fictional demo people until the
+                                    student portal and staff records are
+                                    connected.
                                 </div>
                             )}
                         </div>
@@ -138,6 +147,98 @@ export default function Dashboard({
                         </div>
                     </div>
                 </section>
+
+                {/* by category */}
+                <Panel
+                    title="Cards by category"
+                    description={`Session ${session}`}
+                    bodyClassName="p-0"
+                >
+                    <div className="grid divide-y md:grid-cols-3 md:divide-x md:divide-y-0">
+                        {categories.map((c) => {
+                            const all = c.pending + c.captured + c.printed;
+                            const pct = (n: number) =>
+                                all ? (n / all) * 100 : 0;
+
+                            return (
+                                <Link
+                                    key={c.value}
+                                    href={cardsIndex({
+                                        query: {
+                                            category: c.value,
+                                            status: 'all',
+                                        },
+                                    })}
+                                    className="group space-y-4 p-5 transition-colors hover:bg-muted/40"
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <CategoryBadge
+                                            category={c.value}
+                                            label={c.label}
+                                            className="text-xs"
+                                        />
+                                        <span className="text-2xl font-bold text-navy-900 tabular-nums dark:text-white">
+                                            {all}
+                                        </span>
+                                    </div>
+                                    <div className="flex h-2 overflow-hidden rounded-full bg-muted">
+                                        <div
+                                            className="bg-emerald-500"
+                                            style={{
+                                                width: `${pct(c.printed)}%`,
+                                            }}
+                                        />
+                                        <div
+                                            className="bg-navy-500"
+                                            style={{
+                                                width: `${pct(c.captured)}%`,
+                                            }}
+                                        />
+                                        <div
+                                            className="bg-amber-400"
+                                            style={{
+                                                width: `${pct(c.pending)}%`,
+                                            }}
+                                        />
+                                    </div>
+                                    <dl className="grid grid-cols-3 gap-2 text-xs">
+                                        {(
+                                            [
+                                                [
+                                                    'Awaiting',
+                                                    c.pending,
+                                                    'bg-amber-400',
+                                                ],
+                                                [
+                                                    'Ready',
+                                                    c.captured,
+                                                    'bg-navy-500',
+                                                ],
+                                                [
+                                                    'Printed',
+                                                    c.printed,
+                                                    'bg-emerald-500',
+                                                ],
+                                            ] as const
+                                        ).map(([l, v, dot]) => (
+                                            <div key={l}>
+                                                <dt className="flex items-center gap-1.5 text-muted-foreground">
+                                                    <span
+                                                        className={`size-1.5 rounded-full ${dot}`}
+                                                    />
+                                                    {l}
+                                                </dt>
+                                                <dd className="mt-0.5 font-semibold text-navy-900 tabular-nums dark:text-white">
+                                                    {v}
+                                                </dd>
+                                            </div>
+                                        ))}
+                                    </dl>
+                                </Link>
+                            );
+                        })}
+                    </div>
+                </Panel>
 
                 {/* KPIs */}
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -253,9 +354,14 @@ export default function Dashboard({
                                                 {c.full_name}
                                             </div>
                                             <div className="truncate font-mono text-xs text-muted-foreground">
-                                                {c.matric_no}
+                                                {c.id_number}
                                             </div>
                                         </Link>
+                                        <CategoryBadge
+                                            category={c.category}
+                                            label={c.category_label}
+                                            className="hidden sm:inline-flex"
+                                        />
                                         <Button
                                             size="sm"
                                             variant="outline"
@@ -298,7 +404,7 @@ export default function Dashboard({
                                         <span className="font-medium text-navy-900 dark:text-white">
                                             {e.description}
                                         </span>
-                                        {e.student_name && (
+                                        {e.holder_name && (
                                             <>
                                                 {' '}
                                                 <span className="text-muted-foreground">
@@ -309,14 +415,21 @@ export default function Dashboard({
                                                         href={show(e.card_id)}
                                                         className="hover:underline"
                                                     >
-                                                        {e.student_name}
+                                                        {e.holder_name}
                                                     </Link>
                                                 ) : (
-                                                    e.student_name
+                                                    e.holder_name
                                                 )}
                                             </>
                                         )}
                                     </div>
+                                    {e.category && e.category_label && (
+                                        <CategoryBadge
+                                            category={e.category}
+                                            label={e.category_label}
+                                            className="hidden md:inline-flex"
+                                        />
+                                    )}
                                     <div className="hidden text-muted-foreground sm:block">
                                         {e.user}
                                     </div>
@@ -333,7 +446,8 @@ export default function Dashboard({
                 </Panel>
 
                 <p className="text-center text-xs text-muted-foreground">
-                    Student records from: {directory}
+                    Students from: {directories.student} · Staff from:{' '}
+                    {directories.staff}
                 </p>
             </div>
         </>

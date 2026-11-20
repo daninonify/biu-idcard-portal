@@ -8,6 +8,10 @@ export type CardData = {
     department: string | null;
     faculty: string | null;
     matric: string | null;
+    staffNo?: string | null;
+    designation?: string | null;
+    /** full_time | part_time | diploma: picks the undergraduate colour scheme */
+    studentType?: string | null;
     programme: string | null;
     validUntil: string | null;
 };
@@ -26,7 +30,14 @@ export type CardPhoto = {
 /** Operator's framing tweaks on top of the automatic head framing. */
 export type Adjust = { zoom: number; offX: number; offY: number };
 
-export type Signatures = { registrar?: string | null };
+export type Signatures = {
+    /** uploaded under Portal settings; replaces the old templates' signatures */
+    registrar?: string | null;
+    /** the registrar signatures from the old templates (a: full-time card, b: the others) */
+    legacy?: { a?: string | null; b?: string | null };
+    /** the cardholder's own signature (staff cards) */
+    holder?: string | null;
+};
 
 export type CardProps = {
     data: CardData;
@@ -36,11 +47,11 @@ export type CardProps = {
     innerRef?: Ref<HTMLDivElement>;
 };
 
-export type TemplateKey = 'ug' | 'pg';
+export type TemplateKey = 'ug' | 'pg' | 'staff';
 
 export const DEFAULT_ADJUST: Adjust = { zoom: 1, offX: 0, offY: 0 };
 
 export const LOGOS = {
-    light: '/brand/crest-light.png',
-    navy: '/brand/crest-navy.png',
+    // the official crest, taken from the old NewCard template's artwork
+    light: '/brand/legacy/crest.png',
 };

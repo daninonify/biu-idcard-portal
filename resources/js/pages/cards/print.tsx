@@ -20,11 +20,11 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { useCardPhoto } from '@/hooks/use-card-photo';
 import { capture, index, printed, show } from '@/routes/cards';
-import type { CardDetail, StudentDetail } from '@/types/portal';
+import type { CardDetail, HolderDetail } from '@/types/portal';
 
 type Props = {
     card: CardDetail;
-    student: StudentDetail;
+    holder: HolderDetail;
     cardData: CardData;
     signatures: Signatures;
     reprintRequiresReason: boolean;
@@ -41,7 +41,7 @@ const CHECKLIST = [
 
 export default function PrintCard({
     card,
-    student,
+    holder,
     cardData,
     signatures,
     reprintRequiresReason,
@@ -67,7 +67,7 @@ export default function PrintCard({
 
     return (
         <>
-            <Head title={`Print · ${student.full_name}`} />
+            <Head title={`Print · ${holder.full_name}`} />
             <div className="mx-auto w-full max-w-6xl space-y-6 p-4 md:p-8">
                 <div className="flex flex-wrap items-center gap-4">
                     <Button variant="ghost" size="icon" asChild>
@@ -82,10 +82,10 @@ export default function PrintCard({
                                 : 'Print card'}
                         </div>
                         <h1 className="truncate text-2xl font-bold text-navy-900 dark:text-white">
-                            {student.full_name}
+                            {holder.full_name}
                         </h1>
                         <div className="font-mono text-sm text-muted-foreground">
-                            {student.matric_no}
+                            {holder.id_number}
                         </div>
                     </div>
                     <Button variant="outline" size="lg" asChild>

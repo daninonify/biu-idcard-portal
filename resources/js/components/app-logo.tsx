@@ -9,7 +9,7 @@ export default function AppLogo() {
         <>
             <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-white p-0.5 shadow-sm ring-1 ring-black/5">
                 <img
-                    src="/brand/crest-light.png"
+                    src="/brand/legacy/crest.png"
                     alt=""
                     className="size-full object-contain"
                 />

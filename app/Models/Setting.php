@@ -32,7 +32,8 @@ class Setting extends Model
 
         return [
             'session' => $start.'/'.($start + 1),
-            'valid_until' => (string) ($start + 4),
+            'valid_until' => (string) ($start + 4),           // students, when the portal has no graduation year
+            'staff_valid_until' => (string) ($start + 3),     // staff cards
             'default_background' => '#ffffff',
             'registrar_signature' => null,   // path on the photo disk
             'reprint_requires_reason' => true,

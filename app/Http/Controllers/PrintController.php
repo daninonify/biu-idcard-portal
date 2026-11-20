@@ -23,13 +23,13 @@ class PrintController extends Controller
             return to_route('cards.capture', $card);
         }
 
-        $card->load('student');
+        $card->load('cardholder');
 
         return Inertia::render('cards/print', [
             'card' => CardPresenter::card($card),
-            'student' => CardPresenter::student($card->student),
+            'holder' => CardPresenter::holder($card->cardholder),
             'cardData' => CardPresenter::cardData($card),
-            'signatures' => ['registrar' => Setting::get('registrar_signature') ? route('settings.signature') : null],
+            'signatures' => SignatureController::forCard($card),
             'reprintRequiresReason' => (bool) Setting::get('reprint_requires_reason'),
         ]);
     }

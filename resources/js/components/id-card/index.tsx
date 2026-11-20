@@ -1,12 +1,37 @@
 import type { ComponentType } from 'react';
 import { cn } from '@/lib/utils';
-import { StudentBack } from './backs';
-import { PostgradFront, UndergradFront } from './fronts';
+import { LegacyCard, legacyKeyFor } from './legacy/legacy-card';
+import { LEGACY_SPECS } from './legacy/specs';
 import { CARD_H, CARD_W } from './parts';
+import { PostgradFront } from './pg-front';
 import type { CardProps, TemplateKey } from './types';
 
 export { CARD_H, CARD_W } from './parts';
 export * from './types';
+
+/**
+ * The card designs as printed by the former ID card portal:
+ *  - undergraduate: NewCard.rpt (both sides), with the student-type dot;
+ *  - postgraduate:  its own front (pg-front.tsx) and the NewCard back;
+ *  - staff:         StaffCard2016.rpt.
+ * The .rpt designs are generated from their layouts into legacy/specs.ts.
+ */
+function sides(template: TemplateKey): {
+    Front: ComponentType<CardProps>;
+    Back: ComponentType<CardProps>;
+} {
+    const spec = LEGACY_SPECS[legacyKeyFor(template)];
+
+    return {
+        Front:
+            template === 'pg'
+                ? PostgradFront
+                : (p: CardProps) => (
+                      <LegacyCard {...p} spec={spec} side="front" />
+                  ),
+        Back: (p: CardProps) => <LegacyCard {...p} spec={spec} side="back" />,
+    };
+}
 
 export const TEMPLATES: Record<
     TemplateKey,
@@ -16,8 +41,9 @@ export const TEMPLATES: Record<
         Back: ComponentType<CardProps>;
     }
 > = {
-    ug: { label: 'Undergraduate', Front: UndergradFront, Back: StudentBack },
-    pg: { label: 'Postgraduate', Front: PostgradFront, Back: StudentBack },
+    ug: { label: 'Undergraduate', ...sides('ug') },
+    pg: { label: 'Postgraduate', ...sides('pg') },
+    staff: { label: 'Staff', ...sides('staff') },
 };
 
 /**

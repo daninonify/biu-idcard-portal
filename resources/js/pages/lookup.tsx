@@ -1,7 +1,8 @@
 import { Head, Link } from '@inertiajs/react';
 import { Database, History, ScanSearch } from 'lucide-react';
-import { MatricSearch } from '@/components/portal/matric-search';
+import { IdSearch } from '@/components/portal/id-search';
 import {
+    CategoryBadge,
     EmptyState,
     Panel,
     StatusBadge,
@@ -10,41 +11,62 @@ import {
 } from '@/components/portal/ui';
 import { lookup } from '@/routes';
 import { show } from '@/routes/cards';
-import type { CardRow } from '@/types/portal';
+import type { CardRow, HolderType } from '@/types/portal';
 
-type Props = { directory: string; demoMatrics: string[]; recent: CardRow[] };
+type Source = { name: string; demo: string[] };
 
-export default function Lookup({ directory, demoMatrics, recent }: Props) {
+type Props = {
+    type: HolderType;
+    directories: Record<HolderType, Source>;
+    recent: CardRow[];
+};
+
+export default function Lookup({ type, directories, recent }: Props) {
     return (
         <>
-            <Head title="Student lookup" />
+            <Head title="Lookup" />
             <div className="mx-auto w-full max-w-4xl space-y-8 p-4 md:p-8">
                 <div className="brand-wash rounded-3xl border bg-card px-6 py-10 text-center md:px-12 md:py-14">
                     <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-navy-900 text-gold-300 shadow-lg">
                         <ScanSearch className="size-7" />
                     </div>
                     <h1 className="mt-5 text-3xl font-bold tracking-tight text-navy-900 dark:text-white">
-                        Find a student
+                        Find a student or staff member
                     </h1>
                     <p className="mx-auto mt-2 max-w-md text-muted-foreground">
-                        Enter the matric number. The student's record is pulled
-                        from the student portal and their card for this session
-                        opens.
+                        Students by matric number, staff by staff number. Their
+                        record is pulled from the student portal or the staff
+                        records, and their card for this session opens.
                     </p>
                     <div className="mx-auto mt-8 max-w-xl text-left">
-                        <MatricSearch size="lg" autoFocus hints={demoMatrics} />
+                        <IdSearch
+                            size="lg"
+                            autoFocus
+                            defaultType={type}
+                            hints={{
+                                student: directories.student.demo,
+                                staff: directories.staff.demo,
+                            }}
+                        />
                     </div>
-                    <div className="mt-6 inline-flex items-center gap-2 rounded-full border bg-background/70 px-3 py-1 text-xs text-muted-foreground">
-                        <Database className="size-3.5" /> {directory}
+                    <div className="mt-6 flex flex-wrap justify-center gap-2 text-xs text-muted-foreground">
+                        <span className="inline-flex items-center gap-2 rounded-full border bg-background/70 px-3 py-1">
+                            <Database className="size-3.5" /> Students:{' '}
+                            {directories.student.name}
+                        </span>
+                        <span className="inline-flex items-center gap-2 rounded-full border bg-background/70 px-3 py-1">
+                            <Database className="size-3.5" /> Staff:{' '}
+                            {directories.staff.name}
+                        </span>
                     </div>
                 </div>
 
-                <Panel title="Your recent students" bodyClassName="p-0">
+                <Panel title="Your recent cards" bodyClassName="p-0">
                     {recent.length === 0 ? (
                         <EmptyState
                             icon={History}
-                            title="No students yet"
-                            description="Students you work on will appear here."
+                            title="Nothing yet"
+                            description="Students and staff you work on will appear here."
                         />
                     ) : (
                         <ul className="divide-y">
@@ -64,14 +86,19 @@ export default function Lookup({ directory, demoMatrics, recent }: Props) {
                                             </div>
                                             <div className="truncate text-xs text-muted-foreground">
                                                 <span className="font-mono">
-                                                    {c.matric_no}
+                                                    {c.id_number}
                                                 </span>{' '}
                                                 · {c.department}
                                             </div>
                                         </div>
+                                        <CategoryBadge
+                                            category={c.category}
+                                            label={c.category_label}
+                                            className="hidden sm:inline-flex"
+                                        />
                                         <StatusBadge status={c.status} />
                                         <div
-                                            className="hidden w-28 text-right text-xs text-muted-foreground sm:block"
+                                            className="hidden w-28 text-right text-xs text-muted-foreground md:block"
                                             suppressHydrationWarning
                                         >
                                             {timeAgo(c.updated_at)}
@@ -88,5 +115,5 @@ export default function Lookup({ directory, demoMatrics, recent }: Props) {
 }
 
 Lookup.layout = {
-    breadcrumbs: [{ title: 'Student lookup', href: lookup() }],
+    breadcrumbs: [{ title: 'Lookup', href: lookup() }],
 };

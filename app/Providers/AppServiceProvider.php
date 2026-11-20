@@ -3,17 +3,13 @@
 namespace App\Providers;
 
 use App\Models\User;
-use App\Services\StudentDirectory\DatabaseDirectory;
-use App\Services\StudentDirectory\DemoDirectory;
-use App\Services\StudentDirectory\HttpDirectory;
-use App\Services\StudentDirectory\StudentDirectory;
+use App\Services\Directory\Directories;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
-use InvalidArgumentException;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -22,16 +18,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->singleton(StudentDirectory::class, function () {
-            $config = config('idcard.directory');
-
-            return match ($config['driver']) {
-                'database' => new DatabaseDirectory($config['database']),
-                'http' => new HttpDirectory($config['http']),
-                'demo' => new DemoDirectory,
-                default => throw new InvalidArgumentException("Unknown STUDENT_DIRECTORY [{$config['driver']}]: use demo, database or http."),
-            };
-        });
+        // Student portal + staff records, each configured in config/idcard.php
+        $this->app->singleton(Directories::class);
     }
 
     /**

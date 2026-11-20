@@ -1,36 +1,46 @@
 <?php
 
-namespace App\Services\StudentDirectory;
+namespace App\Services\Directory;
 
+use App\Enums\HolderType;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
 /**
- * Reads students straight from the student portal's database (config/idcard.php
- * maps its column names). Writes only the photo column, and only if configured.
+ * Reads people straight from the source database (config/idcard.php maps its
+ * column names). Writes only the photo column, and only if configured.
  */
-class DatabaseDirectory implements StudentDirectory
+class DatabaseDirectory implements PeopleDirectory
 {
     /** @param array<string, mixed> $config */
-    public function __construct(private readonly array $config) {}
+    public function __construct(
+        private readonly HolderType $type,
+        private readonly array $config,
+        private readonly string $label,
+    ) {}
+
+    public function type(): HolderType
+    {
+        return $this->type;
+    }
 
     public function name(): string
     {
-        return 'Student portal database ('.$this->config['connection'].'.'.$this->config['table'].')';
+        return ucfirst($this->label).' database ('.$this->config['connection'].'.'.$this->config['table'].')';
     }
 
-    public function find(string $matricNo): ?PortalRecord
+    public function find(string $idNumber): ?PortalRecord
     {
         $columns = $this->config['columns'];
 
         try {
             $row = $this->db()->table($this->config['table'])
-                ->whereRaw('UPPER(REPLACE('.$this->wrap($columns['matric_no']).", ' ', '')) = ?", [PortalRecord::normaliseMatric($matricNo)])
+                ->whereRaw('UPPER(REPLACE('.$this->wrap($columns['id_number']).", ' ', '')) = ?", [PortalRecord::normaliseId($idNumber)])
                 ->first();
         } catch (Throwable $e) {
             report($e);
-            throw new StudentDirectoryException('The student portal database could not be reached. Please try again or contact the administrator.');
+            throw new DirectoryException("The {$this->label} could not be reached. Please try again or contact the administrator.");
         }
 
         if ($row === null) {
@@ -51,25 +61,25 @@ class DatabaseDirectory implements StudentDirectory
         return ! empty($this->config['photo_column']);
     }
 
-    public function updatePhoto(string $matricNo, string $jpeg): void
+    public function updatePhoto(string $idNumber, string $jpeg): void
     {
         if (! $this->supportsPhotoUpdate()) {
-            throw new StudentDirectoryException('Updating portal pictures is not configured (PORTAL_DB_PHOTO_COLUMN).');
+            throw new DirectoryException("Sending pictures to the {$this->label} is not configured.");
         }
 
         $table = $this->config['photo_table'] ?: $this->config['table'];
 
         try {
             $updated = $this->db()->table($table)
-                ->where($this->config['columns']['matric_no'], PortalRecord::normaliseMatric($matricNo))
+                ->where($this->config['columns']['id_number'], PortalRecord::normaliseId($idNumber))
                 ->update([$this->config['photo_column'] => $jpeg]);
         } catch (Throwable $e) {
             report($e);
-            throw new StudentDirectoryException('The photo could not be saved to the student portal.');
+            throw new DirectoryException("The photo could not be saved to the {$this->label}.");
         }
 
         if ($updated === 0) {
-            throw new StudentDirectoryException('The student was not found in the portal, so the photo was not saved.');
+            throw new DirectoryException("Not found in the {$this->label}, so the photo was not saved.");
         }
     }
 

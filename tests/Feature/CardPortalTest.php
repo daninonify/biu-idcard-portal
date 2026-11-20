@@ -2,12 +2,13 @@
 
 use App\Enums\CardStatus;
 use App\Enums\CardTemplate;
+use App\Enums\HolderType;
 use App\Models\CardEvent;
 use App\Models\IdCard;
 use App\Models\Setting;
 use App\Models\User;
-use App\Services\StudentDirectory\DemoDirectory;
-use App\Services\StudentDirectory\PortalRecord;
+use App\Services\Directory\DemoDirectory;
+use App\Services\Directory\PortalRecord;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
@@ -15,9 +16,10 @@ use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     Storage::fake('local');
-    config(['idcard.directory.driver' => 'demo', 'idcard.photo_disk' => 'local']);
+    config(['idcard.directory.student.driver' => 'demo', 'idcard.directory.staff.driver' => 'demo', 'idcard.photo_disk' => 'local']);
     $this->operator = User::factory()->create();
-    $this->matric = (new DemoDirectory)->matricNumbers()[0];
+    $this->matric = (new DemoDirectory(HolderType::Student))->idNumbers()[0];
+    $this->staffNo = (new DemoDirectory(HolderType::Staff))->idNumbers()[0];
 });
 
 function jpeg(): UploadedFile
@@ -29,9 +31,9 @@ function jpeg(): UploadedFile
     return UploadedFile::fake()->createWithContent('photo.jpg', (string) ob_get_clean());
 }
 
-function startCard(string $matric): IdCard
+function startCard(string $number, string $type = 'student'): IdCard
 {
-    test()->post(route('lookup.store'), ['matric_no' => strtolower($matric)])->assertRedirect();
+    test()->post(route('lookup.store'), ['type' => $type, 'id_number' => strtolower($number)])->assertRedirect();
 
     return IdCard::query()->latest('id')->firstOrFail();
 }
@@ -73,16 +75,17 @@ it('looks a student up on the portal and starts one card per session', function 
 
     expect(IdCard::count())->toBe(1)
         ->and($card->status)->toBe(CardStatus::Pending)
-        ->and($card->student->matric_no)->toBe($this->matric);
+        ->and($card->cardholder->id_number)->toBe($this->matric)
+        ->and($card->template)->toBe(CardTemplate::Undergraduate);
 
     $this->get(route('cards.show', $card))->assertOk()
-        ->assertInertia(fn ($page) => $page->component('cards/show')->where('student.matric_no', $this->matric));
+        ->assertInertia(fn ($page) => $page->component('cards/show')->where('holder.id_number', $this->matric)->where('holder.type', 'student'));
 });
 
 it('explains when the matric number is unknown', function () {
     $this->actingAs($this->operator)
-        ->post(route('lookup.store'), ['matric_no' => 'XXX/000/000000'])
-        ->assertSessionHasErrors('matric_no');
+        ->post(route('lookup.store'), ['type' => 'student', 'id_number' => 'XXX/000/000000'])
+        ->assertSessionHasErrors('id_number');
     expect(IdCard::count())->toBe(0);
 });
 
@@ -94,9 +97,9 @@ it('picks the postgraduate card for masters and PhD programmes only', function (
 });
 
 it('normalises portal records', function () {
-    $r = PortalRecord::fromArray(['matric_no' => ' scn/csc/ 230101', 'surname' => 'OKAFOR', 'first_name' => 'ada', 'student_type' => 'FULL TIME', 'date_of_birth' => '23/10/2005']);
+    $r = PortalRecord::fromArray(['id_number' => ' scn/csc/ 230101', 'surname' => 'OKAFOR', 'first_name' => 'ada', 'student_type' => 'FULL TIME', 'date_of_birth' => '23/10/2005']);
 
-    expect($r->matric())->toBe('SCN/CSC/230101')
+    expect($r->idNumber())->toBe('SCN/CSC/230101')
         ->and($r->toArray()['surname'])->toBe('Okafor')
         ->and($r->toArray()['student_type'])->toBe('full_time');
 });
@@ -171,16 +174,16 @@ it('sends photos to the student portal', function () {
     $this->post(route('portal-pictures.store'), ['cards' => [$card->id]])->assertRedirect();
 
     expect($card->refresh()->portal_photo_synced_at)->not->toBeNull();
-    Storage::disk('local')->assertExists('demo-portal/'.str_replace('/', '-', $this->matric).'.jpg');
+    Storage::disk('local')->assertExists('demo-portal/student/'.str_replace('/', '-', $this->matric).'.jpg');
 });
 
 it('exports a spreadsheet and records the export', function () {
     $this->actingAs($this->operator);
     startCard($this->matric);
 
-    $res = $this->get(route('data-files.download', ['format' => 'csv', 'session' => Setting::get('session'), 'status' => 'all']));
+    $res = $this->get(route('data-files.download', ['format' => 'csv', 'session' => Setting::get('session'), 'category' => 'all', 'status' => 'all']));
     $res->assertOk();
-    expect($res->streamedContent())->toContain('Matric No')->toContain($this->matric);
+    expect($res->streamedContent())->toContain('ID Number')->toContain('Undergraduate')->toContain($this->matric);
     expect(CardEvent::where('action', 'data_exported')->exists())->toBeTrue();
 });
 
@@ -224,4 +227,131 @@ it('sends strict security headers', function () {
         ->toContain("connect-src 'self'")
         ->toContain("frame-ancestors 'none'")
         ->and($res->headers->get('X-Frame-Options'))->toBe('DENY');
+});
+
+it('looks staff up by staff number and gives them a staff card', function () {
+    $this->actingAs($this->operator);
+
+    $card = startCard($this->staffNo, 'staff');
+
+    expect($card->template)->toBe(CardTemplate::Staff)
+        ->and($card->cardholder->type)->toBe(HolderType::Staff)
+        ->and($card->cardholder->designation)->not->toBeNull()
+        ->and($card->cardholder->programme)->toBeNull();
+
+    $this->get(route('cards.show', $card))
+        ->assertInertia(fn ($page) => $page->where('holder.type', 'staff')->where('card.template', 'staff')
+            ->has('options.templates', 1));
+
+    // a staff number is not a student, and vice versa
+    $this->post(route('lookup.store'), ['type' => 'student', 'id_number' => $this->staffNo])->assertSessionHasErrors('id_number');
+    $this->post(route('lookup.store'), ['type' => 'staff', 'id_number' => $this->matric])->assertSessionHasErrors('id_number');
+});
+
+it('keeps staff cards in the staff category', function () {
+    $this->actingAs($this->operator);
+    $card = startCard($this->staffNo, 'staff');
+
+    $this->patch(route('cards.update', $card), ['template' => 'ug'])->assertSessionHasErrors('template');
+    $this->patch(route('cards.update', $card), ['template' => 'staff', 'designation' => 'Dean', 'staff_category' => 'academic'])
+        ->assertSessionHasNoErrors();
+
+    expect($card->cardholder->refresh()->designation)->toBe('Dean');
+});
+
+it('arranges the card list by category', function () {
+    $this->actingAs($this->operator);
+    startCard($this->matric);
+    startCard($this->staffNo, 'staff');
+
+    $this->get(route('cards.index', ['category' => 'staff', 'status' => 'all']))
+        ->assertInertia(fn ($page) => $page->has('cards.data', 1)
+            ->where('cards.data.0.category', 'staff')
+            ->where('cards.data.0.id_number', $this->staffNo)
+            ->where('categories.0.count', 2)       // all
+            ->where('categories.3.value', 'staff')
+            ->where('categories.3.count', 1));
+
+    $this->get(route('cards.index', ['category' => 'ug', 'status' => 'all']))
+        ->assertInertia(fn ($page) => $page->has('cards.data', 1)->where('cards.data.0.category', 'ug'));
+});
+
+it('filters records and exports by category', function () {
+    $this->actingAs($this->operator);
+    startCard($this->matric);
+    startCard($this->staffNo, 'staff');
+
+    $this->get(route('records', ['category' => 'staff']))
+        ->assertInertia(fn ($page) => $page->where('events.data.0.category', 'staff')->where('events.total', 1));
+
+    $csv = $this->get(route('data-files.download', ['format' => 'csv', 'session' => Setting::get('session'), 'category' => 'staff', 'status' => 'all']))
+        ->streamedContent();
+    expect($csv)->toContain($this->staffNo)->not->toContain($this->matric)->toContain('Staff');
+});
+
+it('sends staff photos to the staff records', function () {
+    $this->actingAs($this->operator);
+    $card = startCard($this->staffNo, 'staff');
+    $this->post(route('cards.photo.store', $card), ['photo' => jpeg(), 'engine' => 'mediapipe', 'framing' => '{}']);
+
+    $this->post(route('portal-pictures.store'), ['cards' => [$card->id]])->assertRedirect();
+
+    Storage::disk('local')->assertExists('demo-portal/staff/'.str_replace('/', '-', $this->staffNo).'.jpg');
+    expect(CardEvent::where('action', 'portal_photo_updated')->value('description'))->toContain('staff records');
+});
+
+function png(int $w = 300, int $h = 100): UploadedFile
+{
+    $img = imagecreatetruecolor($w, $h);
+    imagesavealpha($img, true);
+    imagefill($img, 0, 0, imagecolorallocatealpha($img, 0, 0, 0, 127));
+    imageline($img, 10, 50, $w - 10, 40, imagecolorallocate($img, 20, 20, 40));
+    ob_start();
+    imagepng($img);
+
+    return UploadedFile::fake()->createWithContent('signature.png', (string) ob_get_clean());
+}
+
+it('captures the staff member\'s own signature for the card back', function () {
+    $this->actingAs($this->operator);
+    $card = startCard($this->staffNo, 'staff');
+
+    $this->post(route('cards.signature.store', $card), ['signature' => jpeg()])->assertSessionHasErrors('signature');
+    $this->post(route('cards.signature.store', $card), ['signature' => png()])->assertSessionHasNoErrors();
+
+    $holder = $card->cardholder->refresh();
+    Storage::disk('local')->assertExists($holder->signature_path);
+    $this->get(route('cards.signature', $card))->assertOk()->assertHeader('Content-Type', 'image/png');
+
+    // the print page hands the signature to the card template
+    $this->post(route('cards.photo.store', $card), ['photo' => jpeg(), 'engine' => 'mediapipe', 'framing' => '{}']);
+    $this->get(route('cards.print', $card))
+        ->assertInertia(fn ($page) => $page->where('signatures.holder', fn ($url) => str_contains((string) $url, '/signature')));
+
+    $this->delete(route('cards.signature.destroy', $card))->assertRedirect();
+    expect($holder->refresh()->signature_path)->toBeNull();
+    expect(CardEvent::where('action', 'signature_captured')->exists())->toBeTrue();
+
+    auth()->logout();
+    $this->get(route('cards.signature', $card))->assertRedirect(route('login'));
+});
+
+it('prints the old templates\' registrar signatures until one is uploaded', function () {
+    $this->actingAs($this->operator);
+    $card = startCard($this->matric);
+
+    $this->get(route('signatures.legacy', 'a'))->assertOk()->assertHeader('Content-Type', 'image/png');
+    $this->get(route('signatures.legacy', 'b'))->assertOk();
+    $this->get('/signatures/legacy/z')->assertNotFound();
+
+    $this->get(route('cards.show', $card))
+        ->assertInertia(fn ($page) => $page->where('signatures.registrar', null)
+            ->where('signatures.legacy.a', route('signatures.legacy', 'a')));
+
+    Setting::put('registrar_signature', 'branding/new.png');
+    $this->get(route('cards.show', $card))
+        ->assertInertia(fn ($page) => $page->whereNot('signatures.registrar', null));
+
+    auth()->logout();
+    $this->get(route('signatures.legacy', 'a'))->assertRedirect(route('login'));
 });

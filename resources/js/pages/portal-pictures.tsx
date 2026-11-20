@@ -2,38 +2,60 @@ import { Head, Link, router } from '@inertiajs/react';
 import { CheckCircle2, CloudUpload, ImageUp, Info } from 'lucide-react';
 import { useState } from 'react';
 import { Pagination } from '@/components/portal/pagination';
-import { EmptyState, PageHeader, timeAgo } from '@/components/portal/ui';
+import {
+    CategoryBadge,
+    EmptyState,
+    PageHeader,
+    timeAgo,
+} from '@/components/portal/ui';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { portalPictures } from '@/routes';
 import { show as showCard } from '@/routes/cards';
 import { store } from '@/routes/portal-pictures';
-import type { CardRow, Paginated } from '@/types/portal';
+import type { CardRow, HolderType, Paginated } from '@/types/portal';
+
+type Portal = { name: string; canUpdatePhoto: boolean };
 
 type Props = {
     cards: Paginated<CardRow>;
     show: 'waiting' | 'sent';
-    portal: { name: string; canUpdatePhoto: boolean };
+    category: string;
+    categories: { value: string; label: string; waiting: number }[];
+    portals: Record<HolderType, Portal>;
     waiting: number;
 };
 
-/** "Update portal pictures": push captured photos back to the student portal. */
+/** "Update portal pictures": students' photos to the student portal, staff photos to the staff records. */
 export default function PortalPictures({
     cards,
     show,
-    portal,
+    category,
+    categories,
+    portals,
     waiting,
 }: Props) {
     const [selected, setSelected] = useState<number[]>([]);
     const [sending, setSending] = useState(false);
-    const canSend = show === 'waiting' && portal.canUpdatePhoto;
+    const sendable =
+        show === 'waiting' ? cards.data.filter((c) => c.can_send) : [];
+    const pageIds = sendable.map((c) => c.id);
+    const allSelected =
+        pageIds.length > 0 && pageIds.every((id) => selected.includes(id));
     const toggle = (id: number) =>
         setSelected((s) =>
             s.includes(id) ? s.filter((x) => x !== id) : [...s, id],
         );
-    const pageIds = cards.data.map((c) => c.id);
-    const allSelected =
-        pageIds.length > 0 && pageIds.every((id) => selected.includes(id));
+    const readOnly = (Object.entries(portals) as [HolderType, Portal][]).filter(
+        ([, p]) => !p.canUpdatePhoto,
+    );
+
+    const go = (query: Record<string, string>) =>
+        router.get(
+            portalPictures.url(),
+            { show, category, ...query },
+            { preserveScroll: true, preserveState: true, replace: true },
+        );
 
     const send = (ids: number[]) => {
         setSending(true);
@@ -50,11 +72,6 @@ export default function PortalPictures({
         );
     };
 
-    const tabs: ['waiting' | 'sent', string][] = [
-        ['waiting', `Waiting (${waiting})`],
-        ['sent', 'Already sent'],
-    ];
-
     return (
         <>
             <Head title="Update portal pictures" />
@@ -62,9 +79,9 @@ export default function PortalPictures({
                 <PageHeader
                     eyebrow="Data"
                     title="Update portal pictures"
-                    description={`Send the new passport photos to ${portal.name}, so each student's portal profile matches their ID card.`}
+                    description="Send new passport photos back, so each person's record matches their ID card: students to the student portal, staff to the staff records."
                     actions={
-                        canSend && (
+                        show === 'waiting' && (
                             <>
                                 <Button
                                     variant="outline"
@@ -85,32 +102,74 @@ export default function PortalPictures({
                     }
                 />
 
-                {!portal.canUpdatePhoto && (
+                {readOnly.length > 0 && (
                     <div className="flex gap-3 rounded-2xl border bg-card p-4 text-sm text-muted-foreground">
                         <Info className="size-5 shrink-0 text-navy-500" />
-                        This student portal connection can only read records. An
-                        administrator can enable sending photos back in the
-                        portal configuration (PORTAL_DB_PHOTO_COLUMN or
-                        PORTAL_API_PHOTO_PATH).
+                        <div>
+                            {readOnly.map(([type, p]) => (
+                                <div key={type}>
+                                    <span className="font-medium text-foreground">
+                                        {type === 'staff'
+                                            ? 'Staff'
+                                            : 'Students'}
+                                        :
+                                    </span>{' '}
+                                    {p.name} can only be read, so these photos
+                                    can't be sent back yet.
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 )}
 
-                <div className="inline-flex rounded-xl bg-muted p-1">
-                    {tabs.map(([k, l]) => (
-                        <Link
-                            key={k}
-                            href={portalPictures({ query: { show: k } })}
-                            preserveScroll
-                            className={cn(
-                                'rounded-lg px-4 py-1.5 text-sm font-medium',
-                                show === k
-                                    ? 'bg-background text-navy-900 shadow-sm dark:text-white'
-                                    : 'text-muted-foreground',
-                            )}
-                        >
-                            {l}
-                        </Link>
-                    ))}
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="flex flex-wrap gap-2">
+                        {categories.map((c) => (
+                            <button
+                                key={c.value}
+                                onClick={() => go({ category: c.value })}
+                                className={cn(
+                                    'flex items-center gap-2 rounded-xl border bg-card px-3.5 py-1.5 text-sm font-medium transition-all',
+                                    category === c.value
+                                        ? 'border-navy-500 ring-4 ring-navy-500/10 dark:border-gold-400'
+                                        : 'text-muted-foreground hover:border-navy-300',
+                                )}
+                            >
+                                {c.value === 'all' ? (
+                                    c.label
+                                ) : (
+                                    <CategoryBadge
+                                        category={c.value}
+                                        label={c.label}
+                                    />
+                                )}
+                                <span className="text-xs text-muted-foreground tabular-nums">
+                                    {c.waiting} waiting
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                    <div className="inline-flex rounded-xl bg-muted p-1">
+                        {(
+                            [
+                                ['waiting', `Waiting (${waiting})`],
+                                ['sent', 'Already sent'],
+                            ] as const
+                        ).map(([k, l]) => (
+                            <button
+                                key={k}
+                                onClick={() => go({ show: k })}
+                                className={cn(
+                                    'rounded-lg px-4 py-1.5 text-sm font-medium',
+                                    show === k
+                                        ? 'bg-background text-navy-900 shadow-sm dark:text-white'
+                                        : 'text-muted-foreground',
+                                )}
+                            >
+                                {l}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
                 <div className="rounded-2xl border bg-card">
@@ -124,13 +183,13 @@ export default function PortalPictures({
                             }
                             description={
                                 show === 'waiting'
-                                    ? 'Every captured photo is already on the student portal.'
+                                    ? 'Every captured photo in this category has been sent back.'
                                     : undefined
                             }
                         />
                     ) : (
                         <>
-                            {canSend && (
+                            {pageIds.length > 0 && (
                                 <label className="flex items-center gap-2 border-b px-5 py-3 text-sm text-muted-foreground">
                                     <input
                                         type="checkbox"
@@ -160,6 +219,8 @@ export default function PortalPictures({
                             <div className="grid grid-cols-2 gap-4 p-5 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
                                 {cards.data.map((c) => {
                                     const on = selected.includes(c.id);
+                                    const canSend =
+                                        show === 'waiting' && !!c.can_send;
 
                                     return (
                                         <div
@@ -196,6 +257,11 @@ export default function PortalPictures({
                                                     aria-label={`Select ${c.full_name}`}
                                                 />
                                             )}
+                                            <CategoryBadge
+                                                category={c.category}
+                                                label={c.category_label}
+                                                className="absolute top-2 right-2 shadow-sm"
+                                            />
                                             <Link
                                                 href={showCard(c.id)}
                                                 className="block p-2.5"
@@ -204,7 +270,7 @@ export default function PortalPictures({
                                                     {c.full_name}
                                                 </div>
                                                 <div className="truncate font-mono text-[11px] text-muted-foreground">
-                                                    {c.matric_no}
+                                                    {c.id_number}
                                                 </div>
                                                 <div
                                                     className="mt-1 text-[11px] text-muted-foreground"
